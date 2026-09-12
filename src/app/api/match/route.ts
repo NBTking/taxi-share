@@ -1,0 +1,199 @@
+import { getDirections } from '@/lib/directions';
+import { findMatches, MATCH_DEFAULTS, type RoomCandidate } from '@/lib/matching';
+import { createClient } from '@/lib/supabase/server';
+import type { LatLng, Rider } from '@/lib/types';
+
+/**
+ * POST /api/match
+ *
+ * 합류하려는 사람의 조건을 받아 동승 가능한 방을 찾는다.
+ *
+ * body:
+ *   {
+ *     "rider": {
+ *       "id": "...", "nickname": "지훈",
+ *       "pickup":  { "lat": .., "lng": .. },
+ *       "dropoff": { "lat": .., "lng": .. },
+ *       "soloFare": 13500            // 선택. 없으면 서버가 계산한다
+ *     },
+ *     "departAt": "2026-09-12T20:00:00+09:00"
+ *   }
+ */
+export async function POST(request: Request) {
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return Response.json({ error: 'JSON 본문을 파싱할 수 없습니다' }, { status: 400 });
+  }
+
+  const parsed = parseQuery(body);
+  if ('error' in parsed) return Response.json({ error: parsed.error }, { status: 400 });
+  const { rider, departAt, timeWindowMin } = parsed;
+
+  const supabase = await createClient();
+
+  // 시간창은 SQL 에서 자른다 (rooms_status_depart_idx 를 탄다).
+  // 회랑·방향 필터는 좌표 계산이라 prefilterRooms 가 메모리에서 처리한다.
+  const windowMs = timeWindowMin * 60_000;
+  const at = new Date(departAt).getTime();
+  const { data, error } = await supabase
+    .from('rooms')
+    .select(
+      `id, host_id, origin_lat, origin_lng, dest_lat, dest_lng, depart_at,
+       capacity, detour_tolerance, base_fare, total_distance_m,
+       room_members ( user_id, pickup_lat, pickup_lng, dropoff_lat, dropoff_lng,
+                      solo_fare, profiles ( nickname ) )`,
+    )
+    .eq('status', 'open')
+    .gte('depart_at', new Date(at - windowMs).toISOString())
+    .lte('depart_at', new Date(at + windowMs).toISOString())
+    .limit(50);
+
+  if (error) {
+    console.error('[api/match] supabase', error);
+    return Response.json({ error: '방 목록을 불러오지 못했습니다' }, { status: 500 });
+  }
+
+  // DB 타입을 생성하지 않아서 supabase-js 가 임베드를 배열로 추론한다.
+  // 실제로는 many-to-one 이라 객체가 오므로 toRoomCandidate 에서 양쪽을 모두 받는다.
+  const rooms = ((data ?? []) as unknown as RoomRow[]).map(toRoomCandidate);
+
+  // 절약액을 보여주려면 "혼자 갔을 때" 요금이 필요하다.
+  // 클라이언트가 안 보냈으면 여기서 한 번 계산한다(길찾기 1회).
+  let riderWithSolo = rider;
+  if (rider.soloFare === undefined) {
+    try {
+      const solo = await getDirections({ origin: rider.pickup, destination: rider.dropoff });
+      riderWithSolo = { ...rider, soloFare: solo.taxiFare + solo.tollFare };
+    } catch {
+      // 실패해도 매칭 자체는 가능하다. 절약액만 빠진다.
+    }
+  }
+
+  try {
+    const matches = await findMatches(
+      { ...parsed, rider: riderWithSolo },
+      rooms,
+      { getDirections },
+    );
+    return Response.json({
+      soloFare: riderWithSolo.soloFare ?? null,
+      scanned: rooms.length,
+      matches,
+    });
+  } catch (e) {
+    console.error('[api/match]', e);
+    return Response.json({ error: '매칭 계산에 실패했습니다' }, { status: 500 });
+  }
+}
+
+/** Supabase 행(스네이크 케이스) → matching.ts 가 쓰는 형태 */
+type RoomRow = {
+  id: string;
+  host_id: string;
+  origin_lat: number;
+  origin_lng: number;
+  dest_lat: number;
+  dest_lng: number;
+  depart_at: string;
+  capacity: number;
+  detour_tolerance: number;
+  base_fare: number;
+  total_distance_m: number | null;
+  room_members: Array<{
+    user_id: string;
+    pickup_lat: number;
+    pickup_lng: number;
+    dropoff_lat: number;
+    dropoff_lng: number;
+    solo_fare: number | null;
+    /** PostgREST 임베드. 객체로 오지만 타입 추론상 배열일 수도 있다. */
+    profiles: { nickname: string } | { nickname: string }[] | null;
+  }>;
+};
+
+function nicknameOf(profiles: RoomRow['room_members'][number]['profiles']): string {
+  if (!profiles) return '익명';
+  const p = Array.isArray(profiles) ? profiles[0] : profiles;
+  return p?.nickname ?? '익명';
+}
+
+function toRoomCandidate(row: RoomRow): RoomCandidate {
+  return {
+    id: row.id,
+    hostId: row.host_id,
+    origin: { lat: row.origin_lat, lng: row.origin_lng },
+    destination: { lat: row.dest_lat, lng: row.dest_lng },
+    departAt: row.depart_at,
+    capacity: row.capacity,
+    detourTolerance: row.detour_tolerance,
+    baseFare: row.base_fare,
+    currentDistanceM: row.total_distance_m ?? undefined,
+    members: (row.room_members ?? []).map((m) => ({
+      id: m.user_id,
+      nickname: nicknameOf(m.profiles),
+      pickup: { lat: m.pickup_lat, lng: m.pickup_lng },
+      dropoff: { lat: m.dropoff_lat, lng: m.dropoff_lng },
+      soloFare: m.solo_fare ?? undefined,
+    })),
+  };
+}
+
+type ParsedQuery = {
+  rider: Rider;
+  departAt: string;
+  timeWindowMin: number;
+  corridorM: number;
+  maxCandidates: number;
+};
+
+function parseQuery(body: unknown): ParsedQuery | { error: string } {
+  const input = body as Record<string, unknown>;
+  const r = input?.rider as Record<string, unknown> | undefined;
+
+  if (!r || typeof r !== 'object') return { error: 'rider 가 없습니다' };
+  if (typeof r.id !== 'string' || r.id.length === 0) return { error: 'rider.id 가 없습니다' };
+  if (typeof r.nickname !== 'string' || r.nickname.length === 0) {
+    return { error: 'rider.nickname 이 없습니다' };
+  }
+
+  const pickup = parseLatLng(r.pickup, 'rider.pickup');
+  if (typeof pickup === 'string') return { error: pickup };
+  const dropoff = parseLatLng(r.dropoff, 'rider.dropoff');
+  if (typeof dropoff === 'string') return { error: dropoff };
+
+  const departAt = input.departAt;
+  if (typeof departAt !== 'string' || Number.isNaN(new Date(departAt).getTime())) {
+    return { error: 'departAt 이 올바른 날짜 문자열이 아닙니다' };
+  }
+
+  const soloFare =
+    typeof r.soloFare === 'number' && Number.isFinite(r.soloFare) && r.soloFare > 0
+      ? r.soloFare
+      : undefined;
+
+  return {
+    rider: { id: r.id, nickname: r.nickname, pickup, dropoff, soloFare },
+    departAt,
+    timeWindowMin: positiveNumber(input.timeWindowMin, MATCH_DEFAULTS.timeWindowMin),
+    corridorM: positiveNumber(input.corridorM, MATCH_DEFAULTS.corridorM),
+    maxCandidates: positiveNumber(input.maxCandidates, MATCH_DEFAULTS.maxCandidates),
+  };
+}
+
+function positiveNumber(value: unknown, fallback: number): number {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : fallback;
+}
+
+function parseLatLng(value: unknown, field: string): LatLng | string {
+  if (typeof value !== 'object' || value === null) return `${field} 가 없거나 객체가 아닙니다`;
+  const { lat, lng } = value as { lat?: unknown; lng?: unknown };
+  if (typeof lat !== 'number' || !Number.isFinite(lat) || lat < -90 || lat > 90) {
+    return `${field}.lat 이 올바르지 않습니다`;
+  }
+  if (typeof lng !== 'number' || !Number.isFinite(lng) || lng < -180 || lng > 180) {
+    return `${field}.lng 이 올바르지 않습니다`;
+  }
+  return { lat, lng };
+}
