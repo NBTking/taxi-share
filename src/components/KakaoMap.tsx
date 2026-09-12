@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Map, Polyline, CustomOverlayMap, useKakaoLoader } from 'react-kakao-maps-sdk';
 import type { LatLng } from '@/lib/types';
 
@@ -51,6 +51,25 @@ export function KakaoMap({
   className,
 }: Props) {
   const [map, setMap] = useState<kakao.maps.Map | null>(null);
+
+  /**
+   * 같은 지점의 핀을 하나로 묶는다.
+   *
+   * 두 사람이 같은 곳에서 타면 마커가 정확히 겹쳐서 뒤엣것이 보이지 않는다.
+   * (예: 방장과 합류자가 둘 다 정문에서 탑승)
+   * 소수점 4자리 ≈ 11m 면 "같은 승차 지점"으로 볼 만하다.
+   *
+   * (전역 Map 은 react-kakao-maps-sdk 의 Map 컴포넌트에 가려지므로 객체를 쓴다)
+   */
+  const clusters = useMemo(() => {
+    const byPoint: Record<string, { position: LatLng; pins: MapPin[] }> = {};
+    for (const pin of pins) {
+      const key = `${pin.position.lat.toFixed(4)},${pin.position.lng.toFixed(4)}`;
+      if (byPoint[key]) byPoint[key].pins.push(pin);
+      else byPoint[key] = { position: pin.position, pins: [pin] };
+    }
+    return Object.entries(byPoint).map(([key, value]) => ({ key, ...value }));
+  }, [pins]);
 
   // center/level 만으로는 출발지와 도착지를 한 화면에 담을 수 없다.
   // (도착지를 중심에 두면 출발지가 화면 밖으로 나간다)
@@ -122,16 +141,24 @@ export function KakaoMap({
           />
         )}
 
-        {pins.map((pin, i) => (
-          <CustomOverlayMap key={`${pin.kind}-${i}`} position={pin.position} yAnchor={1}>
+        {clusters.map((cluster) => (
+          <CustomOverlayMap key={cluster.key} position={cluster.position} yAnchor={1}>
             <div className="flex -translate-y-1 flex-col items-center">
-              <span className="whitespace-nowrap rounded-md bg-white/95 px-2 py-0.5 text-xs font-medium text-slate-800 shadow ring-1 ring-black/5">
-                {pin.label}
+              {/* 겹친 핀은 라벨을 세로로 쌓아 누가 누군지 구분되게 한다 */}
+              <span className="flex flex-col items-center whitespace-nowrap rounded-md bg-white/95 px-2 py-0.5 text-xs font-medium text-slate-800 shadow ring-1 ring-black/5">
+                {cluster.pins.map((pin, i) => (
+                  <span key={i}>{pin.label}</span>
+                ))}
               </span>
-              <span
-                className={`mt-0.5 flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-bold text-white shadow ring-2 ring-white ${PIN_STYLE[pin.kind]}`}
-              >
-                {pin.order ?? ''}
+              <span className="mt-0.5 flex gap-0.5">
+                {cluster.pins.map((pin, i) => (
+                  <span
+                    key={i}
+                    className={`flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-bold text-white shadow ring-2 ring-white ${PIN_STYLE[pin.kind]}`}
+                  >
+                    {pin.order ?? ''}
+                  </span>
+                ))}
               </span>
             </div>
           </CustomOverlayMap>
