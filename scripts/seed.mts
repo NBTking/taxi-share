@@ -31,8 +31,10 @@ const PEOPLE: Record<string, Person> = {
   준호: { nickname: '준호' },
   하늘: { nickname: '하늘' },
   서연: { nickname: '서연' },
-  다인: { nickname: '다인' },
   태윤: { nickname: '태윤' },
+  지우: { nickname: '지우' },
+  다인: { nickname: '다인' },
+  현우: { nickname: '현우' },
 };
 
 /** 분 단위 오프셋 → ISO. 시드를 언제 돌려도 "지금 기준"이 되도록. */
@@ -59,25 +61,31 @@ type SeedRoom = {
   members: SeedMember[];
 };
 
+/**
+ * 홈 화면의 출발 옵션은 '10분 내' 와 '30분 내' 두 가지다.
+ * 매칭 시간창이 ±10분이므로 각각 [0,+20] / [+20,+40] 구간을 본다.
+ * 두 옵션 모두에서 카드가 2장 뜨도록 방을 양쪽에 배치한다.
+ */
 const ROOMS: SeedRoom[] = [
+  // ---- 10분 내 출발 ----
   {
-    label: 'R1 고려대 → 강남역',
+    label: 'R1 고려대 → 강남역  (+8분)',
     note: '민서 혼자. 합류하면 2명',
     host: '민서',
     origin: KU,
     destination: GANGNAM,
-    departInMin: 30,
+    departInMin: 8,
     totalDistanceM: 12007,
     totalFare: 17600,
     members: [{ who: '민서', pickup: KU, dropoff: GANGNAM, soloFare: 17600, isHost: true }],
   },
   {
-    label: 'R2 고려대 → 강남역 (2명)',
-    note: '왕십리에서 한 명 태우고 압구정에 내려주는 방. 합류하면 3명이라 더 싸다',
+    label: 'R2 고려대 → 강남역  (+12분, 2명)',
+    note: '왕십리에서 태우고 압구정에 내려주는 방. 합류하면 3명이라 더 싸다',
     host: '준호',
     origin: KU,
     destination: GANGNAM,
-    departInMin: 28,
+    departInMin: 12,
     totalDistanceM: 13671,
     totalFare: 19100,
     members: [
@@ -85,38 +93,54 @@ const ROOMS: SeedRoom[] = [
       { who: '하늘', pickup: WANGSIMNI, dropoff: APGUJEONG, soloFare: 9700 },
     ],
   },
+  // ---- 30분 내 출발 ----
   {
-    label: 'R3 고려대 → 신촌역',
-    note: '필터 테스트. 서쪽이라 회랑에서 8km 벗어난다',
+    label: 'R3 고려대 → 강남역  (+28분)',
+    note: '서연 혼자. 합류하면 2명',
     host: '서연',
     origin: KU,
-    destination: SINCHON,
-    departInMin: 32,
-    totalDistanceM: 10535,
-    totalFare: 16500,
-    members: [{ who: '서연', pickup: KU, dropoff: SINCHON, soloFare: 16500, isHost: true }],
+    destination: GANGNAM,
+    departInMin: 28,
+    totalDistanceM: 12007,
+    totalFare: 17600,
+    members: [{ who: '서연', pickup: KU, dropoff: GANGNAM, soloFare: 17600, isHost: true }],
   },
   {
-    label: 'R4 강남역 → 고려대 (역방향)',
-    note: '필터 테스트. 이동 방향이 반대라 제외되어야 한다',
+    label: 'R4 고려대 → 강남역  (+32분, 2명)',
+    note: '왕십리 경유. 합류하면 3명',
+    host: '태윤',
+    origin: KU,
+    destination: GANGNAM,
+    departInMin: 32,
+    totalDistanceM: 13671,
+    totalFare: 19100,
+    members: [
+      { who: '태윤', pickup: KU, dropoff: GANGNAM, soloFare: 17600, isHost: true },
+      { who: '지우', pickup: WANGSIMNI, dropoff: APGUJEONG, soloFare: 9700 },
+    ],
+  },
+  // ---- 필터 테스트 ----
+  {
+    label: 'R5 강남역 → 고려대  (역방향)',
+    note: '이동 방향이 반대라 제외되어야 한다',
     host: '다인',
     origin: GANGNAM,
     destination: KU,
-    departInMin: 30,
+    departInMin: 12,
     totalDistanceM: 11776,
     totalFare: 15500,
     members: [{ who: '다인', pickup: GANGNAM, dropoff: KU, soloFare: 15500, isHost: true }],
   },
   {
-    label: 'R5 고려대 → 강남역 (2시간 뒤)',
-    note: '필터 테스트. 시간창 밖이라 제외되어야 한다',
-    host: '태윤',
+    label: 'R6 고려대 → 신촌역  (회랑 이탈)',
+    note: '서쪽이라 회랑에서 8km 벗어난다',
+    host: '현우',
     origin: KU,
-    destination: GANGNAM,
-    departInMin: 120,
-    totalDistanceM: 12007,
-    totalFare: 17600,
-    members: [{ who: '태윤', pickup: KU, dropoff: GANGNAM, soloFare: 17600, isHost: true }],
+    destination: SINCHON,
+    departInMin: 28,
+    totalDistanceM: 10535,
+    totalFare: 16500,
+    members: [{ who: '현우', pickup: KU, dropoff: SINCHON, soloFare: 16500, isHost: true }],
   },
 ];
 
@@ -129,7 +153,7 @@ async function main() {
 
   console.log('\n완료. 데모 시나리오:');
   console.log(`  고려대(${KU.lat},${KU.lng}) 에서 타고 강남역에서 내리려는 사람`);
-  console.log('  → R1, R2 가 후보로 뜬다. R3 는 회랑 이탈, R4 는 역방향, R5 는 시간창 밖으로 제외');
+  console.log("  → '10분 내' 는 R1·R2, '30분 내' 는 R3·R4 가 뜬다. R5(역방향) R6(회랑 이탈)은 항상 제외");
 }
 
 /** 없는 사람만 익명 가입으로 만든다. 재실행해도 계정이 쌓이지 않는다. */

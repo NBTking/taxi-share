@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { KakaoMap, coordToAddress, type MapPin } from '@/components/KakaoMap';
 import { PlaceSearch } from '@/components/PlaceSearch';
-import { toDateTimeLocal } from '@/lib/format';
 import { HUB, QUICK_PLACES, type Place } from '@/lib/places';
 import type { LatLng } from '@/lib/types';
 
@@ -31,7 +30,10 @@ type Props = {
 export function TripForm({ onSearch, searching, disabled }: Props) {
   const [origin, setOrigin] = useState<Place | null>(HUB);
   const [destination, setDestination] = useState<Place | null>(null);
-  const [departAt, setDepartAt] = useState(() => toDateTimeLocal(new Date(Date.now() + 30 * 60_000)));
+  /** 빠른 선택 칩과 지도 클릭이 어느 쪽을 채울지 */
+  const [quickTarget, setQuickTarget] = useState<'origin' | 'destination'>('destination');
+  /** 지금부터 몇 분 안에 출발할지. 심야 택시는 '언제'보다 '지금 곧'이 현실적이다. */
+  const [withinMin, setWithinMin] = useState<10 | 30>(30);
 
   const [locating, setLocating] = useState(true);
   /** 출발지가 GPS 에서 온 것인지. 지도에서 직접 찍으면 false 가 된다. */
@@ -80,12 +82,14 @@ export function TripForm({ onSearch, searching, disabled }: Props) {
 
   async function handleMapPick(point: LatLng) {
     const place: Place = { ...point, address: await coordToAddress(point) };
-    // 빈 쪽부터 채우고, 둘 다 차 있으면 도착지를 새로 찍은 걸로 간주한다.
-    if (!origin) {
-      pickOrigin(place);
-    } else {
-      setDestination(place);
-    }
+    if (quickTarget === 'origin') pickOrigin(place);
+    else setDestination(place);
+  }
+
+  /** 빠른 선택 칩. 지도 클릭과 같은 대상(출발/도착)을 채운다. */
+  function pickQuick(place: Place) {
+    if (quickTarget === 'origin') pickOrigin(place);
+    else setDestination(place);
   }
 
   const pins = useMemo<MapPin[]>(() => {
@@ -122,7 +126,7 @@ export function TripForm({ onSearch, searching, disabled }: Props) {
       />
 
       <p className="text-xs text-slate-400 dark:text-slate-500">
-        지도를 누르면 도착지가 채워집니다. 출발지를 바꾸려면 아래 검색창을 이용하세요.
+        지도를 누르거나 아래 장소를 고르면 {quickTarget === 'origin' ? '출발지' : '도착지'}가 채워집니다.
       </p>
 
       <div className="space-y-2 rounded-xl bg-slate-50 p-3 text-sm dark:bg-slate-900">
@@ -142,7 +146,27 @@ export function TripForm({ onSearch, searching, disabled }: Props) {
           onSelect={setDestination}
         />
 
-        <div className="flex flex-wrap gap-1.5 pt-1">
+        <div className="flex items-center gap-2 pt-1">
+          <span className="text-xs text-slate-400">빠른 선택</span>
+          <div className="flex overflow-hidden rounded-full ring-1 ring-slate-200 dark:ring-slate-700">
+            {(['origin', 'destination'] as const).map((t) => (
+              <button
+                key={t}
+                type="button"
+                onClick={() => setQuickTarget(t)}
+                className={`px-2.5 py-1 text-xs font-medium transition ${
+                  quickTarget === t
+                    ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900'
+                    : 'bg-white text-slate-500 dark:bg-slate-800 dark:text-slate-400'
+                }`}
+              >
+                {t === 'origin' ? '출발' : '도착'}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="flex flex-wrap gap-1.5">
           <button
             type="button"
             onClick={() => locate({ silent: false })}
@@ -155,7 +179,7 @@ export function TripForm({ onSearch, searching, disabled }: Props) {
             <button
               key={p.address}
               type="button"
-              onClick={() => setDestination(p)}
+              onClick={() => pickQuick(p)}
               className="rounded-full bg-white px-2.5 py-1 text-xs text-slate-600 ring-1 ring-slate-200 transition hover:bg-slate-100 dark:bg-slate-800 dark:text-slate-300 dark:ring-slate-700"
             >
               {p.address}
@@ -163,15 +187,25 @@ export function TripForm({ onSearch, searching, disabled }: Props) {
           ))}
         </div>
 
-        <label className="flex items-center justify-between pt-1">
-          <span className="text-slate-500 dark:text-slate-400">출발 시각</span>
-          <input
-            type="datetime-local"
-            value={departAt}
-            onChange={(e) => setDepartAt(e.target.value)}
-            className="rounded-lg bg-white px-2 py-1 text-sm ring-1 ring-slate-200 dark:bg-slate-800 dark:ring-slate-700"
-          />
-        </label>
+        <div className="flex items-center gap-2 pt-1">
+          <span className="text-slate-500 dark:text-slate-400">출발</span>
+          <div className="flex gap-1.5">
+            {([10, 30] as const).map((m) => (
+              <button
+                key={m}
+                type="button"
+                onClick={() => setWithinMin(m)}
+                className={`rounded-full px-3 py-1 text-xs font-medium transition ${
+                  withinMin === m
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-white text-slate-500 ring-1 ring-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:ring-slate-700'
+                }`}
+              >
+                {m}분 내
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
 
       {locateError && <p className="text-xs text-slate-500 dark:text-slate-400">{locateError}</p>}
@@ -180,7 +214,12 @@ export function TripForm({ onSearch, searching, disabled }: Props) {
         type="button"
         onClick={() => {
           if (!origin || !destination) return;
-          onSearch({ origin, destination, departAt: new Date(departAt).toISOString() });
+          // 버튼을 누른 시점 기준으로 계산해야 화면을 오래 켜둬도 시각이 밀리지 않는다
+          onSearch({
+            origin,
+            destination,
+            departAt: new Date(Date.now() + withinMin * 60_000).toISOString(),
+          });
         }}
         disabled={!canSearch}
         className="rounded-xl bg-blue-600 px-4 py-3 font-semibold text-white transition hover:bg-blue-700 disabled:bg-slate-300 dark:disabled:bg-slate-700"
