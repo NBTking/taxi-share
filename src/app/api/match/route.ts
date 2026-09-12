@@ -39,11 +39,14 @@ export async function POST(request: Request) {
   // 회랑·방향 필터는 좌표 계산이라 prefilterRooms 가 메모리에서 처리한다.
   const windowMs = timeWindowMin * 60_000;
   const at = new Date(departAt).getTime();
+  // 이미 떠난 택시는 보여주지 않는다.
+  // 예약처럼 지금과 가까운 시각을 고르면 구간 앞쪽이 과거로 넘어갈 수 있다.
+  const from = Math.max(at - windowMs, Date.now());
   const { data, error } = await supabase
     .from('rooms')
     .select(ROOM_SELECT)
     .eq('status', 'open')
-    .gte('depart_at', new Date(at - windowMs).toISOString())
+    .gte('depart_at', new Date(from).toISOString())
     .lte('depart_at', new Date(at + windowMs).toISOString())
     .limit(50);
 
