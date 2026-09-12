@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { KakaoMap, coordToAddress, type MapPin } from '@/components/KakaoMap';
 import { PlaceSearch } from '@/components/PlaceSearch';
+import { nextOccurrence, toTimeInput } from '@/lib/format';
 import { HUB, QUICK_PLACES, type Place } from '@/lib/places';
 import type { LatLng } from '@/lib/types';
 
@@ -12,6 +13,14 @@ import type { LatLng } from '@/lib/types';
  * 출발지/도착지/시각 상태를 이 안에서 전부 들고 있고, 확정된 결과만 onSearch 로 넘긴다.
  * 바깥(page.tsx)은 GPS·지도 클릭·검색 같은 입력 방식을 알 필요가 없다.
  */
+
+type DepartMode = 'in10' | 'in30' | 'scheduled';
+
+const DEPART_LABELS: Record<DepartMode, string> = {
+  in10: '10분 내',
+  in30: '30분 내',
+  scheduled: '예약',
+};
 
 export type Trip = {
   origin: Place;
@@ -32,8 +41,15 @@ export function TripForm({ onSearch, searching, disabled }: Props) {
   const [destination, setDestination] = useState<Place | null>(null);
   /** 빠른 선택 칩과 지도 클릭이 어느 쪽을 채울지 */
   const [quickTarget, setQuickTarget] = useState<'origin' | 'destination'>('destination');
-  /** 지금부터 몇 분 안에 출발할지. 심야 택시는 '언제'보다 '지금 곧'이 현실적이다. */
-  const [withinMin, setWithinMin] = useState<10 | 30>(30);
+  /**
+   * 출발 시점. 심야 택시는 '몇 시 몇 분'보다 '지금 곧'이 현실적이라
+   * 임박 옵션을 앞에 두고, 미리 잡아두는 경우만 예약으로 받는다.
+   */
+  const [departMode, setDepartMode] = useState<DepartMode>('in30');
+  /** 예약일 때의 시각 ("21:30"). 날짜는 받지 않고 '다음에 오는 그 시각'으로 해석한다. */
+  const [scheduledTime, setScheduledTime] = useState(() =>
+    toTimeInput(new Date(Date.now() + 60 * 60_000)),
+  );
 
   const [locating, setLocating] = useState(true);
   /** 출발지가 GPS 에서 온 것인지. 지도에서 직접 찍으면 false 가 된다. */
@@ -100,6 +116,16 @@ export function TripForm({ onSearch, searching, disabled }: Props) {
     if (destination) list.push({ position: destination, label: '도착', kind: 'destination' });
     return list;
   }, [origin, destination, originFromGps]);
+
+  /**
+   * 출발 시각을 확정한다.
+   * 임박 옵션은 '검색을 누른 시점' 기준으로 계산해야 화면을 오래 켜둬도 밀리지 않는다.
+   */
+  function resolveDepartAt(): string {
+    if (departMode === 'in10') return new Date(Date.now() + 10 * 60_000).toISOString();
+    if (departMode === 'in30') return new Date(Date.now() + 30 * 60_000).toISOString();
+    return nextOccurrence(scheduledTime).toISOString();
+  }
 
   const canSearch = Boolean(origin && destination && !searching && !disabled);
 
@@ -190,22 +216,37 @@ export function TripForm({ onSearch, searching, disabled }: Props) {
         <div className="flex items-center gap-2 pt-1">
           <span className="text-slate-500 dark:text-slate-400">출발</span>
           <div className="flex gap-1.5">
-            {([10, 30] as const).map((m) => (
+            {(Object.keys(DEPART_LABELS) as DepartMode[]).map((m) => (
               <button
                 key={m}
                 type="button"
-                onClick={() => setWithinMin(m)}
+                onClick={() => setDepartMode(m)}
                 className={`rounded-full px-3 py-1 text-xs font-medium transition ${
-                  withinMin === m
+                  departMode === m
                     ? 'bg-blue-600 text-white'
                     : 'bg-white text-slate-500 ring-1 ring-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:ring-slate-700'
                 }`}
               >
-                {m}분 내
+                {DEPART_LABELS[m]}
               </button>
             ))}
           </div>
         </div>
+
+        {departMode === 'scheduled' && (
+          <div className="flex items-center justify-between gap-2 rounded-lg bg-white px-3 py-2 ring-1 ring-slate-200 dark:bg-slate-800 dark:ring-slate-700">
+            <input
+              type="time"
+              value={scheduledTime}
+              onChange={(e) => setScheduledTime(e.target.value)}
+              className="bg-transparent text-sm outline-none"
+            />
+            <span className="text-xs text-slate-400">
+              {nextOccurrence(scheduledTime).getDate() === new Date().getDate() ? '오늘' : '내일'}{' '}
+              출발
+            </span>
+          </div>
+        )}
       </div>
 
       {locateError && <p className="text-xs text-slate-500 dark:text-slate-400">{locateError}</p>}
@@ -214,12 +255,7 @@ export function TripForm({ onSearch, searching, disabled }: Props) {
         type="button"
         onClick={() => {
           if (!origin || !destination) return;
-          // 버튼을 누른 시점 기준으로 계산해야 화면을 오래 켜둬도 시각이 밀리지 않는다
-          onSearch({
-            origin,
-            destination,
-            departAt: new Date(Date.now() + withinMin * 60_000).toISOString(),
-          });
+          onSearch({ origin, destination, departAt: resolveDepartAt() });
         }}
         disabled={!canSearch}
         className="rounded-xl bg-blue-600 px-4 py-3 font-semibold text-white transition hover:bg-blue-700 disabled:bg-slate-300 dark:disabled:bg-slate-700"

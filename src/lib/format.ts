@@ -18,3 +18,23 @@ export function toDateTimeLocal(d: Date): string {
   const pad = (n: number) => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
+
+/** Date → time 입력값 ("21:30") */
+export function toTimeInput(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+/**
+ * "21:30" → 그 시각이 오는 가장 가까운 Date.
+ *
+ * 이미 지난 시각이면 내일로 본다. 심야 이동 서비스라
+ * 밤 11시에 "00:30 출발" 을 예약하는 경우가 흔하다.
+ */
+export function nextOccurrence(time: string, now: Date = new Date()): Date {
+  const [h, m] = time.split(':').map(Number);
+  const d = new Date(now);
+  d.setHours(h ?? 0, m ?? 0, 0, 0);
+  if (d.getTime() <= now.getTime()) d.setDate(d.getDate() + 1);
+  return d;
+}
