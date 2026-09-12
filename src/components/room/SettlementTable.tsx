@@ -1,4 +1,4 @@
-import { km, won } from '@/lib/format';
+import { MIN_SEGMENT_M, km, won } from '@/lib/format';
 import type { RoomDetail } from './types';
 
 /** 구간별 정산 근거. MatchCard 의 미리보기 테이블과 같은 형식을 방 상세에서 그대로 보여준다. */
@@ -14,9 +14,12 @@ export function SettlementTable({ room }: Props) {
     <div className="rounded-xl bg-white p-3 text-xs ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-800">
       <table className="w-full">
         <tbody>
-          {/* 같은 지점에서 연속 승하차하면 거리 0 인 구간이 생긴다. 0원 행은 혼란만 준다. */}
+          {/*
+            같은 지점에서 연속으로 타고 내리면 수십 미터짜리 구간이 생긴다.
+            '0.0km 1원 ÷ 1명' 같은 행은 근거가 아니라 잡음이라 감춘다.
+          */}
           {segments
-            .filter((seg) => seg.distance_m > 0)
+            .filter((seg) => seg.distance_m >= MIN_SEGMENT_M)
             .map((seg) => (
               <tr key={seg.seq} className="text-slate-600 dark:text-slate-300">
                 <td className="py-1 pr-2">

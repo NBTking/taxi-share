@@ -56,3 +56,11 @@ export function fromNow(iso: string, now: Date = new Date()): string {
   const m = diffMin % 60;
   return m === 0 ? `${h}시간 뒤` : `${h}시간 ${m}분 뒤`;
 }
+
+/**
+ * 정산표에 표시할 최소 구간 거리(m).
+ *
+ * 같은 지점에서 두 사람이 연달아 타고 내리면 수십 미터짜리 구간이 생기는데,
+ * "0.0km 1원 ÷ 1명" 같은 행은 근거가 아니라 잡음이다.
+ */
+export const MIN_SEGMENT_M = 100;
