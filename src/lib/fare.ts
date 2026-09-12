@@ -56,20 +56,26 @@ export type SettleInput = {
  * 최적 순서 탐색(TSP)은 의도적으로 하지 않는다. 계산량 대비 얻는 것이 없고,
  * 규칙이 단순해야 사용자에게 설명할 수 있다.
  *
- *   - 픽업: 합류한 순서대로 (riders 배열 순서)
- *   - 하차: 최종 목적지에서 "먼" 사람부터 (이동 방향과 일치)
+ * 승차·하차 모두 **목적지에서 먼 순서**로 정렬한다.
+ * 택시가 가장 먼 지점에서 출발해 목적지 쪽으로 한 방향으로 이동하므로
+ * 되돌아가는 구간이 생기지 않는다.
+ *
+ * 픽업을 '합류한 순서'로 하면 안 된다. 나중에 합류한 사람이 출발지 근처에서
+ * 타는 경우 "출발지 → 중간 → 출발지" 처럼 왔던 길을 되돌아가게 된다.
  */
 export function buildRideEvents(riders: Rider[], destination: LatLng): RideEvent[] {
   if (riders.length === 0) {
     throw new Error('buildRideEvents: riders 가 비어 있습니다');
   }
 
-  const pickups: RideEvent[] = riders.map((r) => ({
-    riderId: r.id,
-    type: 'pickup',
-    point: r.pickup,
-    label: `${r.nickname} 승차`,
-  }));
+  const pickups: RideEvent[] = [...riders]
+    .sort((a, b) => haversineM(b.pickup, destination) - haversineM(a.pickup, destination))
+    .map((r) => ({
+      riderId: r.id,
+      type: 'pickup' as const,
+      point: r.pickup,
+      label: `${r.nickname} 승차`,
+    }));
 
   const dropoffs: RideEvent[] = [...riders]
     .sort((a, b) => haversineM(b.dropoff, destination) - haversineM(a.dropoff, destination))

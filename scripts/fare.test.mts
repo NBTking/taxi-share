@@ -64,8 +64,13 @@ check('전체거리 10000m', s.totalDistanceM, 10000);
 // ---------- 하차 순서 ----------
 const ev = buildRideEvents(riders, gangnam);
 check('이벤트 4개', ev.length, 4);
-check('픽업 먼저, 합류순', [ev[0].riderId, ev[1].riderId], ['A', 'B']);
+check('픽업도 목적지에서 먼 순', [ev[0].riderId, ev[1].riderId], ['A', 'B']);
 check('목적지에서 먼 민서가 먼저 하차', [ev[2].riderId, ev[3].riderId], ['A', 'B']);
+
+// ---------- 나중에 합류한 사람이 출발지 근처여도 되돌아가지 않는다 ----------
+const late: Rider = { id: 'C', nickname: '늦참', pickup: gate, dropoff: gangnam };
+const ev2 = buildRideEvents([riders[1], late], gangnam);
+check('출발지 근처 합류자가 먼저 탄다', [ev2[0].riderId, ev2[1].riderId], ['C', 'B']);
 
 // ---------- 방어 로직 ----------
 function throws(fn: () => unknown): boolean {

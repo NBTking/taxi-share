@@ -33,7 +33,9 @@ export function SettlementTable({ room }: Props) {
               <td className="py-1 pr-2" colSpan={2}>
                 기본요금
               </td>
-              <td className="py-1 pl-2 text-right tabular-nums">÷ {memberCount}명</td>
+              <td className="py-1 pl-2 text-right tabular-nums">
+                {won(room.base_fare)} ÷ {memberCount}명
+              </td>
             </tr>
           )}
         </tbody>

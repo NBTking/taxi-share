@@ -16,7 +16,7 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { GANGNAM, CHEONGGYESAN, PANGYO, JEONGJA, SADANG, GUNNAE, type Place } from '../src/lib/places';
+import { KU, WANGSIMNI, APGUJEONG, GANGNAM, SINCHON, type Place } from '../src/lib/places';
 
 // 좌표는 src/lib/places.ts 한 곳에서만 관리한다.
 // 학교를 바꾸려면 그 파일의 HUB 만 수정하면 시드와 화면이 같이 따라온다.
@@ -61,62 +61,62 @@ type SeedRoom = {
 
 const ROOMS: SeedRoom[] = [
   {
-    label: 'R1 강남역 → 정자역',
+    label: 'R1 고려대 → 강남역',
     note: '민서 혼자. 합류하면 2명',
     host: '민서',
-    origin: GANGNAM,
-    destination: JEONGJA,
+    origin: KU,
+    destination: GANGNAM,
     departInMin: 30,
-    totalDistanceM: 20470,
-    totalFare: 23400,
-    members: [{ who: '민서', pickup: GANGNAM, dropoff: JEONGJA, soloFare: 23400, isHost: true }],
+    totalDistanceM: 12007,
+    totalFare: 17600,
+    members: [{ who: '민서', pickup: KU, dropoff: GANGNAM, soloFare: 17600, isHost: true }],
   },
   {
-    label: 'R2 강남역 → 정자역 (2명)',
-    note: '이미 청계산입구에서 한 명을 태운 방. 합류하면 3명이라 더 싸다',
+    label: 'R2 고려대 → 강남역 (2명)',
+    note: '왕십리에서 한 명 태우고 압구정에 내려주는 방. 합류하면 3명이라 더 싸다',
     host: '준호',
-    origin: GANGNAM,
-    destination: JEONGJA,
+    origin: KU,
+    destination: GANGNAM,
     departInMin: 28,
-    totalDistanceM: 24406,
-    totalFare: 28400,
+    totalDistanceM: 13671,
+    totalFare: 19100,
     members: [
-      { who: '준호', pickup: GANGNAM, dropoff: JEONGJA, soloFare: 23400, isHost: true },
-      { who: '하늘', pickup: CHEONGGYESAN, dropoff: PANGYO, soloFare: 15000 },
+      { who: '준호', pickup: KU, dropoff: GANGNAM, soloFare: 17600, isHost: true },
+      { who: '하늘', pickup: WANGSIMNI, dropoff: APGUJEONG, soloFare: 9700 },
     ],
   },
   {
-    label: 'R3 강남역 → 사당역',
-    note: '필터 테스트. 서쪽 방향이라 회랑에서 벗어난다',
+    label: 'R3 고려대 → 신촌역',
+    note: '필터 테스트. 서쪽이라 회랑에서 8km 벗어난다',
     host: '서연',
-    origin: GANGNAM,
-    destination: SADANG,
+    origin: KU,
+    destination: SINCHON,
     departInMin: 32,
-    totalDistanceM: 6842,
-    totalFare: 10400,
-    members: [{ who: '서연', pickup: GANGNAM, dropoff: SADANG, soloFare: 10400, isHost: true }],
+    totalDistanceM: 10535,
+    totalFare: 16500,
+    members: [{ who: '서연', pickup: KU, dropoff: SINCHON, soloFare: 16500, isHost: true }],
   },
   {
-    label: 'R4 정자역 → 강남역 (역방향)',
+    label: 'R4 강남역 → 고려대 (역방향)',
     note: '필터 테스트. 이동 방향이 반대라 제외되어야 한다',
     host: '다인',
-    origin: JEONGJA,
-    destination: GANGNAM,
+    origin: GANGNAM,
+    destination: KU,
     departInMin: 30,
-    totalDistanceM: 21089,
-    totalFare: 23900,
-    members: [{ who: '다인', pickup: JEONGJA, dropoff: GANGNAM, soloFare: 23900, isHost: true }],
+    totalDistanceM: 11776,
+    totalFare: 15500,
+    members: [{ who: '다인', pickup: GANGNAM, dropoff: KU, soloFare: 15500, isHost: true }],
   },
   {
-    label: 'R5 강남역 → 정자역 (2시간 뒤)',
+    label: 'R5 고려대 → 강남역 (2시간 뒤)',
     note: '필터 테스트. 시간창 밖이라 제외되어야 한다',
     host: '태윤',
-    origin: GANGNAM,
-    destination: JEONGJA,
+    origin: KU,
+    destination: GANGNAM,
     departInMin: 120,
-    totalDistanceM: 20470,
-    totalFare: 23400,
-    members: [{ who: '태윤', pickup: GANGNAM, dropoff: JEONGJA, soloFare: 23400, isHost: true }],
+    totalDistanceM: 12007,
+    totalFare: 17600,
+    members: [{ who: '태윤', pickup: KU, dropoff: GANGNAM, soloFare: 17600, isHost: true }],
   },
 ];
 
@@ -128,7 +128,7 @@ async function main() {
   await insertRooms();
 
   console.log('\n완료. 데모 시나리오:');
-  console.log(`  청계산입구역(${CHEONGGYESAN.lat},${CHEONGGYESAN.lng}) 에서 타고 궁내동(${GUNNAE.lat},${GUNNAE.lng}) 에서 내리려는 사람`);
+  console.log(`  고려대(${KU.lat},${KU.lng}) 에서 타고 강남역에서 내리려는 사람`);
   console.log('  → R1, R2 가 후보로 뜬다. R3 는 회랑 이탈, R4 는 역방향, R5 는 시간창 밖으로 제외');
 }
 
