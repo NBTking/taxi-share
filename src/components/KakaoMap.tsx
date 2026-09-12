@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Map, Polyline, CustomOverlayMap, useKakaoLoader } from 'react-kakao-maps-sdk';
+import { haversineM } from '@/lib/geo';
 import type { LatLng } from '@/lib/types';
 
 /**
@@ -20,6 +21,12 @@ export type MapPin = {
   /** 경유 순번. 주면 핀에 숫자가 찍힌다. */
   order?: number;
 };
+
+/**
+ * 이 픽셀 거리 안에 들어오면 한 마커로 합친다.
+ * 마커(24px) + 라벨이 서로 닿기 시작하는 지점이 대략 이 정도다.
+ */
+const MARKER_MERGE_PX = 56;
 
 const PIN_STYLE: Record<PinKind, string> = {
   origin: 'bg-emerald-500',
@@ -51,25 +58,50 @@ export function KakaoMap({
   className,
 }: Props) {
   const [map, setMap] = useState<kakao.maps.Map | null>(null);
+  /** 축척이 바뀌면 화면상 간격이 달라지므로 묶음을 다시 계산해야 한다. */
+  const [zoomLevel, setZoomLevel] = useState(level);
+  const wrapperRef = useRef<HTMLDivElement>(null);
 
   /**
-   * 같은 지점의 핀을 하나로 묶는다.
+   * 화면에서 겹치는 핀을 하나로 묶는다.
    *
-   * 두 사람이 같은 곳에서 타면 마커가 정확히 겹쳐서 뒤엣것이 보이지 않는다.
-   * (예: 방장과 합류자가 둘 다 정문에서 탑승)
-   * 소수점 4자리 ≈ 11m 면 "같은 승차 지점"으로 볼 만하다.
+   * 거리 기준(예: 11m)으로 묶으면 지도를 축소했을 때 문제가 생긴다.
+   * 실제로 1km 떨어진 두 지점도 축소하면 화면에서는 몇 픽셀 차이라 서로 가린다.
+   * 그래서 지도 투영을 써서 **화면 픽셀 거리**로 묶는다.
    *
-   * (전역 Map 은 react-kakao-maps-sdk 의 Map 컴포넌트에 가려지므로 객체를 쓴다)
+   * 투영을 아직 쓸 수 없으면(지도 로딩 전) 좌표가 같은 것만 묶는 방식으로 물러선다.
+   *
+   * (전역 Map 은 react-kakao-maps-sdk 의 Map 컴포넌트에 가려지므로 객체/배열을 쓴다)
    */
   const clusters = useMemo(() => {
-    const byPoint: Record<string, { position: LatLng; pins: MapPin[] }> = {};
-    for (const pin of pins) {
-      const key = `${pin.position.lat.toFixed(4)},${pin.position.lng.toFixed(4)}`;
-      if (byPoint[key]) byPoint[key].pins.push(pin);
-      else byPoint[key] = { position: pin.position, pins: [pin] };
+    // 현재 축척에서 1픽셀이 몇 미터인지 구한다.
+    // 지도 가로폭이 담고 있는 실제 거리 ÷ 화면 가로 픽셀.
+    let metersPerPx = 0;
+    const bounds = map?.getBounds();
+    const widthPx = wrapperRef.current?.clientWidth ?? 0;
+    if (bounds && widthPx > 0) {
+      const sw = bounds.getSouthWest();
+      const ne = bounds.getNorthEast();
+      const acrossM = haversineM(
+        { lat: sw.getLat(), lng: sw.getLng() },
+        { lat: sw.getLat(), lng: ne.getLng() },
+      );
+      metersPerPx = acrossM / widthPx;
     }
-    return Object.entries(byPoint).map(([key, value]) => ({ key, ...value }));
-  }, [pins]);
+
+    const groups: { key: string; position: LatLng; pins: MapPin[] }[] = [];
+    for (const pin of pins) {
+      const near = groups.find((g) => {
+        const gapM = haversineM(g.position, pin.position);
+        // 축척을 모르면(로딩 전) 좌표가 사실상 같은 것만 묶는다
+        return metersPerPx > 0 ? gapM / metersPerPx < MARKER_MERGE_PX : gapM < 15;
+      });
+      if (near) near.pins.push(pin);
+      else groups.push({ key: `${pin.kind}-${groups.length}`, position: pin.position, pins: [pin] });
+    }
+    return groups;
+    // wrapperRef 는 반응형 값이 아니지만 축척이 바뀔 때마다 다시 계산되므로 충분하다
+  }, [pins, map, zoomLevel]);
 
   // center/level 만으로는 출발지와 도착지를 한 화면에 담을 수 없다.
   // (도착지를 중심에 두면 출발지가 화면 밖으로 나간다)
@@ -81,6 +113,8 @@ export function KakaoMap({
     }
     // 핀이 가장자리에 붙지 않도록 여백을 준다
     map.setBounds(bounds, 48, 24, 24, 24);
+    // setBounds 는 축척을 바꾸지만 onZoomChanged 가 항상 오지는 않는다
+    setZoomLevel(map.getLevel());
   }, [map, pins, fitPins]);
 
   const [loading, error] = useKakaoLoader({
@@ -108,7 +142,7 @@ export function KakaoMap({
   }
 
   return (
-    <div className={`relative overflow-hidden rounded-xl ${className ?? ''}`}>
+    <div ref={wrapperRef} className={`relative overflow-hidden rounded-xl ${className ?? ''}`}>
       {loading && (
         <div className="absolute inset-0 z-10 flex items-center justify-center bg-slate-100 text-sm text-slate-500 dark:bg-slate-800 dark:text-slate-400">
           지도 불러오는 중…
@@ -120,6 +154,7 @@ export function KakaoMap({
         level={level}
         isPanto
         onCreate={setMap}
+        onZoomChanged={(target) => setZoomLevel(target.getLevel())}
         style={{ width: '100%', height: '100%' }}
         onClick={
           onPick
