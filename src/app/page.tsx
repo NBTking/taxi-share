@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { MatchCard } from '@/components/MatchCard';
 import { TripForm, type Trip } from '@/components/TripForm';
 import { won } from '@/lib/format';
@@ -17,7 +18,9 @@ import { useMe } from '@/lib/useMe';
 export default function Home() {
   const { me, error: authError } = useMe();
 
+  const router = useRouter();
   const [searching, setSearching] = useState(false);
+  const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<MatchResponse | null>(null);
   const [lastTrip, setLastTrip] = useState<Trip | null>(null);
@@ -49,6 +52,39 @@ export default function Home() {
       setError(e instanceof Error ? e.message : '매칭에 실패했습니다');
     } finally {
       setSearching(false);
+    }
+  }
+
+  /**
+   * 맞는 방이 없으면 내가 방장이 된다.
+   *
+   * 방금 검색한 조건(lastTrip)을 그대로 쓴다. 여기서 다시 입력하게 하면
+   * "탈 사람을 못 찾았다" 는 실망 위에 입력 부담까지 얹는 꼴이 된다.
+   */
+  async function handleCreateRoom() {
+    if (!me || !lastTrip) return;
+    setCreating(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/rooms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          hostId: me.id,
+          nickname: me.nickname,
+          origin: { lat: lastTrip.origin.lat, lng: lastTrip.origin.lng },
+          originAddress: lastTrip.origin.address,
+          destination: { lat: lastTrip.destination.lat, lng: lastTrip.destination.lng },
+          destinationAddress: lastTrip.destination.address,
+          departAt: lastTrip.departAt,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? '방을 만들지 못했습니다');
+      router.push(`/rooms/${json.roomId}`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '방을 만들지 못했습니다');
+      setCreating(false);
     }
   }
 
@@ -127,6 +163,16 @@ export default function Home() {
                   맞지 않아 제외됐습니다.
                 </p>
               )}
+
+              {/* 마음에 드는 방이 없을 수도 있으니 방장이 되는 길도 열어둔다 */}
+              <button
+                type="button"
+                onClick={handleCreateRoom}
+                disabled={creating || !me || !lastTrip}
+                className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-600 transition hover:bg-slate-50 disabled:opacity-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-900"
+              >
+                {creating ? '방 만드는 중…' : '직접 방 만들기'}
+              </button>
             </>
           ) : (
             <div className="rounded-xl border border-dashed border-slate-200 p-6 text-center dark:border-slate-700">
@@ -139,6 +185,18 @@ export default function Home() {
               {result.soloFare && (
                 <p className="mt-2 text-xs text-slate-400">혼자 타면 {won(result.soloFare)}</p>
               )}
+
+              <button
+                type="button"
+                onClick={handleCreateRoom}
+                disabled={creating || !me || !lastTrip}
+                className="mt-4 w-full rounded-xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:bg-slate-300 dark:disabled:bg-slate-700"
+              >
+                {creating ? '방 만드는 중…' : '내가 방 만들고 기다리기'}
+              </button>
+              <p className="mt-2 text-xs text-slate-400">
+                방을 만들어두면 같은 방향으로 가는 사람이 합류할 수 있어요.
+              </p>
             </div>
           )}
         </section>
