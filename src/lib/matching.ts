@@ -75,6 +75,8 @@ export const REJECT_MESSAGES: Record<RejectReason, string> = {
 
 export type MatchResult = {
   roomId: string;
+  /** 이 방의 출발 예정 시각(ISO). 카드에서 "몇 시 출발" 을 보여주는 데 쓴다. */
+  departAt: string;
   accepted: boolean;
   reason?: RejectReason;
   /** 나를 태우느라 늘어난 거리(m) */
@@ -201,6 +203,7 @@ async function evaluateRoom(
 ): Promise<MatchResult> {
   const base: MatchResult = {
     roomId: room.id,
+    departAt: room.departAt,
     accepted: false,
     detourM: 0,
     detourRatio: 0,
@@ -250,6 +253,7 @@ async function evaluateRoom(
 
     return {
       roomId: room.id,
+      departAt: room.departAt,
       accepted: true,
       detourM,
       detourRatio,

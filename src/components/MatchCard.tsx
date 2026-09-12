@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { km, minutes, won } from '@/lib/format';
+import { fromNow, km, minutes, toClock, won } from '@/lib/format';
 import type { MatchResult } from '@/lib/matching';
 import type { JoinResponse } from '@/lib/rooms';
 import type { LatLng } from '@/lib/types';
@@ -82,6 +82,10 @@ export function MatchCard({
     <article className="overflow-hidden rounded-xl bg-white ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-800">
       <div className="flex items-center justify-between p-4">
         <div>
+          {/* 시계 시각만 있으면 얼마나 남았는지 암산해야 한다. 둘 다 적는다. */}
+          <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
+            {toClock(match.departAt)} 출발 · {fromNow(match.departAt)}
+          </p>
           <p className="text-2xl font-bold">{won(match.myFare)}</p>
           {match.savedFare !== undefined && match.savedFare > 0 && (
             <p className="text-sm font-medium text-emerald-600 dark:text-emerald-400">

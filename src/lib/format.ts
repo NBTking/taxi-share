@@ -38,3 +38,21 @@ export function nextOccurrence(time: string, now: Date = new Date()): Date {
   if (d.getTime() <= now.getTime()) d.setDate(d.getDate() + 1);
   return d;
 }
+
+/** ISO 문자열 → "오후 7:42" */
+export function toClock(iso: string): string {
+  return new Date(iso).toLocaleTimeString('ko-KR', { hour: 'numeric', minute: '2-digit' });
+}
+
+/**
+ * ISO 문자열 → "12분 뒤" / "곧 출발" / "1시간 20분 뒤"
+ * 시계 시각만 보면 얼마나 남았는지 암산해야 한다. 둘 다 보여주는 편이 빠르다.
+ */
+export function fromNow(iso: string, now: Date = new Date()): string {
+  const diffMin = Math.round((new Date(iso).getTime() - now.getTime()) / 60_000);
+  if (diffMin <= 0) return '곧 출발';
+  if (diffMin < 60) return `${diffMin}분 뒤`;
+  const h = Math.floor(diffMin / 60);
+  const m = diffMin % 60;
+  return m === 0 ? `${h}시간 뒤` : `${h}시간 ${m}분 뒤`;
+}
