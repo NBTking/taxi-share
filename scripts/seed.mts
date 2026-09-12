@@ -62,87 +62,104 @@ type SeedRoom = {
 };
 
 /**
- * 홈 화면의 출발 옵션은 '10분 내' 와 '30분 내' 두 가지다.
- * 매칭 시간창이 ±10분이므로 각각 [0,+20] / [+20,+40] 구간을 본다.
- * 두 옵션 모두에서 카드가 2장 뜨도록 방을 양쪽에 배치한다.
+ * 심사가 언제 이뤄질지 모르므로(무인 심사) 방을 앞으로 SPAN_HOURS 동안
+ * STEP_MIN 간격으로 깔아둔다.
+ *
+ * 매칭 시간창이 ±10분이라 어떤 고정 시각도 20분을 못 버틴다.
+ * 시드를 한 번 돌리고 방치하면 8~12분 뒤부터 "조건에 맞는 택시가 없어요" 가 된다.
+ * 15분 간격이면 어느 시점에 열어도 가장 가까운 방이 7.5분 이내라 항상 걸린다.
+ * 심사 시점을 모르므로 3일치를 미리 깔아 여유를 둔다(방 650개, 시딩 7초).
  */
-const ROOMS: SeedRoom[] = [
-  // ---- 10분 내 출발 ----
-  {
-    label: 'R1 고려대 → 강남역  (+8분)',
-    note: '민서 혼자. 합류하면 2명',
-    host: '민서',
-    origin: KU,
-    destination: GANGNAM,
-    departInMin: 8,
-    totalDistanceM: 12007,
-    totalFare: 17600,
-    members: [{ who: '민서', pickup: KU, dropoff: GANGNAM, soloFare: 17600, isHost: true }],
-  },
-  {
-    label: 'R2 고려대 → 강남역  (+12분, 2명)',
-    note: '왕십리에서 태우고 압구정에 내려주는 방. 합류하면 3명이라 더 싸다',
-    host: '준호',
-    origin: KU,
-    destination: GANGNAM,
-    departInMin: 12,
-    totalDistanceM: 13671,
-    totalFare: 19100,
-    members: [
-      { who: '준호', pickup: KU, dropoff: GANGNAM, soloFare: 17600, isHost: true },
-      { who: '하늘', pickup: WANGSIMNI, dropoff: APGUJEONG, soloFare: 9700 },
-    ],
-  },
-  // ---- 30분 내 출발 ----
-  {
-    label: 'R3 고려대 → 강남역  (+28분)',
-    note: '서연 혼자. 합류하면 2명',
-    host: '서연',
-    origin: KU,
-    destination: GANGNAM,
-    departInMin: 28,
-    totalDistanceM: 12007,
-    totalFare: 17600,
-    members: [{ who: '서연', pickup: KU, dropoff: GANGNAM, soloFare: 17600, isHost: true }],
-  },
-  {
-    label: 'R4 고려대 → 강남역  (+32분, 2명)',
-    note: '왕십리 경유. 합류하면 3명',
-    host: '태윤',
-    origin: KU,
-    destination: GANGNAM,
-    departInMin: 32,
-    totalDistanceM: 13671,
-    totalFare: 19100,
-    members: [
-      { who: '태윤', pickup: KU, dropoff: GANGNAM, soloFare: 17600, isHost: true },
-      { who: '지우', pickup: WANGSIMNI, dropoff: APGUJEONG, soloFare: 9700 },
-    ],
-  },
-  // ---- 필터 테스트 ----
-  {
-    label: 'R5 강남역 → 고려대  (역방향)',
-    note: '이동 방향이 반대라 제외되어야 한다',
-    host: '다인',
-    origin: GANGNAM,
-    destination: KU,
-    departInMin: 12,
-    totalDistanceM: 11776,
-    totalFare: 15500,
-    members: [{ who: '다인', pickup: GANGNAM, dropoff: KU, soloFare: 15500, isHost: true }],
-  },
-  {
-    label: 'R6 고려대 → 신촌역  (회랑 이탈)',
-    note: '서쪽이라 회랑에서 8km 벗어난다',
-    host: '현우',
-    origin: KU,
-    destination: SINCHON,
-    departInMin: 28,
-    totalDistanceM: 10535,
-    totalFare: 16500,
-    members: [{ who: '현우', pickup: KU, dropoff: SINCHON, soloFare: 16500, isHost: true }],
-  },
-];
+const SPAN_HOURS = 72;
+const STEP_MIN = 15;
+
+/** 카카오 실측값 (고려대 기준) */
+const FARE = {
+  soloRoute: { distanceM: 12007, fare: 17600 },
+  viaRoute: { distanceM: 13671, fare: 19100 },
+  sinchon: { distanceM: 10535, fare: 16500 },
+  reverse: { distanceM: 11776, fare: 15500 },
+};
+
+const HOSTS = ['민서', '준호', '서연', '태윤', '지우', '현우'];
+const RIDERS = ['하늘', '다인'];
+
+function buildRooms(): SeedRoom[] {
+  const rooms: SeedRoom[] = [];
+  let n = 0;
+
+  for (let t = 5; t <= SPAN_HOURS * 60; t += STEP_MIN) {
+    const host = HOSTS[n % HOSTS.length];
+    const rider = RIDERS[n % RIDERS.length];
+    n++;
+
+    // 1인 방 — 합류하면 2명
+    rooms.push({
+      label: `고려대 → 강남역 (+${t}분)`,
+      note: '1명',
+      host,
+      origin: KU,
+      destination: GANGNAM,
+      departInMin: t,
+      totalDistanceM: FARE.soloRoute.distanceM,
+      totalFare: FARE.soloRoute.fare,
+      members: [
+        { who: host, pickup: KU, dropoff: GANGNAM, soloFare: FARE.soloRoute.fare, isHost: true },
+      ],
+    });
+
+    // 2인 방 — 왕십리에서 태우고 압구정에 내려준다. 합류하면 3명이라 더 싸다
+    const host2 = HOSTS[n % HOSTS.length];
+    n++;
+    rooms.push({
+      label: `고려대 → 강남역 (+${t + 3}분, 2명)`,
+      note: '2명',
+      host: host2,
+      origin: KU,
+      destination: GANGNAM,
+      departInMin: t + 3,
+      totalDistanceM: FARE.viaRoute.distanceM,
+      totalFare: FARE.viaRoute.fare,
+      members: [
+        { who: host2, pickup: KU, dropoff: GANGNAM, soloFare: FARE.soloRoute.fare, isHost: true },
+        { who: rider, pickup: WANGSIMNI, dropoff: APGUJEONG, soloFare: 9700 },
+      ],
+    });
+
+    // 2시간마다 필터 테스트용 방(역방향 / 회랑 이탈)도 하나씩
+    if (t % 120 < STEP_MIN) {
+      rooms.push({
+        label: `강남역 → 고려대 (+${t}분, 역방향)`,
+        note: '필터: 역방향',
+        host: '다인',
+        origin: GANGNAM,
+        destination: KU,
+        departInMin: t,
+        totalDistanceM: FARE.reverse.distanceM,
+        totalFare: FARE.reverse.fare,
+        members: [
+          { who: '다인', pickup: GANGNAM, dropoff: KU, soloFare: FARE.reverse.fare, isHost: true },
+        ],
+      });
+      rooms.push({
+        label: `고려대 → 신촌역 (+${t}분, 회랑 이탈)`,
+        note: '필터: 회랑 이탈',
+        host: '하늘',
+        origin: KU,
+        destination: SINCHON,
+        departInMin: t,
+        totalDistanceM: FARE.sinchon.distanceM,
+        totalFare: FARE.sinchon.fare,
+        members: [
+          { who: '하늘', pickup: KU, dropoff: SINCHON, soloFare: FARE.sinchon.fare, isHost: true },
+        ],
+      });
+    }
+  }
+  return rooms;
+}
+
+const ROOMS: SeedRoom[] = buildRooms();
 
 async function main() {
   console.log(`→ ${SUPABASE_URL}\n`);
@@ -151,9 +168,10 @@ async function main() {
   await deleteAllRooms();
   await insertRooms();
 
-  console.log('\n완료. 데모 시나리오:');
-  console.log(`  고려대(${KU.lat},${KU.lng}) 에서 타고 강남역에서 내리려는 사람`);
-  console.log("  → '10분 내' 는 R1·R2, '30분 내' 는 R3·R4 가 뜬다. R5(역방향) R6(회랑 이탈)은 항상 제외");
+  console.log(`
+완료. 앞으로 ${SPAN_HOURS}시간 동안 ${STEP_MIN}분 간격으로 방 ${ROOMS.length}개를 깔았습니다.`);
+  console.log('  고려대에서 강남역으로 가려는 사람이 언제 열어도 후보가 뜹니다.');
+  console.log('  역방향(강남→고려대) · 회랑 이탈(고려대→신촌) 방은 필터에 걸려 항상 제외됩니다.');
 }
 
 /** 없는 사람만 익명 가입으로 만든다. 재실행해도 계정이 쌓이지 않는다. */
@@ -200,11 +218,18 @@ async function deleteAllRooms() {
 }
 
 async function insertRooms() {
-  for (const room of ROOMS) {
-    const hostId = idOf(room.host);
-    const [created] = await rest<Array<{ id: string }>>('POST', '/rest/v1/rooms', [
-      {
-        host_id: hostId,
+  // 방이 수백 개라 한 건씩 넣으면 몇 분이 걸린다.
+  // PostgREST 는 배열을 받으면 한 번에 넣고 생성된 행을 순서대로 돌려준다.
+  const CHUNK = 100;
+
+  for (let i = 0; i < ROOMS.length; i += CHUNK) {
+    const batch = ROOMS.slice(i, i + CHUNK);
+
+    const created = await rest<Array<{ id: string }>>(
+      'POST',
+      '/rest/v1/rooms',
+      batch.map((room) => ({
+        host_id: idOf(room.host),
         origin_lat: room.origin.lat,
         origin_lng: room.origin.lng,
         origin_address: room.origin.address,
@@ -216,14 +241,12 @@ async function insertRooms() {
         status: 'open',
         total_distance_m: room.totalDistanceM,
         total_fare: room.totalFare,
-      },
-    ]);
+      })),
+    );
 
-    await rest(
-      'POST',
-      '/rest/v1/room_members',
-      room.members.map((m, i) => ({
-        room_id: created.id,
+    const members = batch.flatMap((room, idx) =>
+      room.members.map((m, order) => ({
+        room_id: created[idx].id,
         user_id: idOf(m.who),
         pickup_lat: m.pickup.lat,
         pickup_lng: m.pickup.lng,
@@ -231,15 +254,16 @@ async function insertRooms() {
         dropoff_lat: m.dropoff.lat,
         dropoff_lng: m.dropoff.lng,
         dropoff_address: m.dropoff.address,
-        pickup_order: i + 1,
+        pickup_order: order + 1,
+        dropoff_order: order + 1,
         solo_fare: m.soloFare,
+        final_fare: m.soloFare,
         is_host: m.isHost ?? false,
       })),
     );
+    await rest('POST', '/rest/v1/room_members', members);
 
-    console.log(
-      `  ${room.label.padEnd(26)} ${String(room.members.length)}명 / ${room.totalFare}원   ${room.note}`,
-    );
+    console.log(`  ${i + batch.length}/${ROOMS.length} 개 방 생성`);
   }
 }
 
