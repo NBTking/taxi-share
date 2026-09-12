@@ -94,6 +94,19 @@ export type MatchResult = {
   pickupOrder?: number;
 };
 
+/**
+ * POST /api/match 의 응답 형태.
+ *
+ * 화면 담당자가 API 완성을 기다리지 않고 작업할 수 있도록 계약을 타입으로 고정해 둔다.
+ */
+export type MatchResponse = {
+  /** 혼자 탔을 때 요금(원). 계산에 실패하면 null */
+  soloFare: number | null;
+  /** 1차 필터 전, DB 에서 읽어온 방 개수 */
+  scanned: number;
+  matches: MatchResult[];
+};
+
 type PrefilterHit = {
   room: RoomCandidate;
   /** 방 경로에서 내 승차지점이 벗어난 거리(m) */

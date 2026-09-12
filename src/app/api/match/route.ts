@@ -1,5 +1,10 @@
 import { getDirections } from '@/lib/directions';
-import { findMatches, MATCH_DEFAULTS, type RoomCandidate } from '@/lib/matching';
+import {
+  findMatches,
+  MATCH_DEFAULTS,
+  type MatchResponse,
+  type RoomCandidate,
+} from '@/lib/matching';
 import { createClient } from '@/lib/supabase/server';
 import type { LatLng, Rider } from '@/lib/types';
 
@@ -77,11 +82,12 @@ export async function POST(request: Request) {
       rooms,
       { getDirections },
     );
-    return Response.json({
+    const body: MatchResponse = {
       soloFare: riderWithSolo.soloFare ?? null,
       scanned: rooms.length,
       matches,
-    });
+    };
+    return Response.json(body);
   } catch (e) {
     console.error('[api/match]', e);
     return Response.json({ error: '매칭 계산에 실패했습니다' }, { status: 500 });
