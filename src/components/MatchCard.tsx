@@ -1,8 +1,12 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { km, minutes, won } from '@/lib/format';
 import type { MatchResult } from '@/lib/matching';
+import type { JoinResponse } from '@/lib/rooms';
+import type { LatLng } from '@/lib/types';
+import { useMe } from '@/lib/useMe';
 
 /**
  * 매칭된 택시 한 대를 보여주는 카드.
@@ -10,19 +14,69 @@ import type { MatchResult } from '@/lib/matching';
  * 부담금과 절약액을 먼저 크게 보여주고, 근거(구간별 분할)는 접어둔다.
  * "왜 내가 이 금액인지"를 펼쳐서 확인할 수 있다는 점이 이 서비스의 설득 포인트다.
  *
- * 🅱️ 합류 기능이 여기에 붙는다:
- *   POST /api/rooms/[id]/join → { roomId, pickupOrder, myFare, settlement }
- *   성공하면 /rooms/[roomId] 로 이동.
+ * 🅱️ 합류 기능: POST /api/rooms/[id]/join → JoinResponse. 성공하면 /rooms/[roomId] 로 이동.
  */
 
 type Props = {
   match: MatchResult;
   myId: string;
+  /**
+   * 합류 요청에 실어 보낼 내 승하차 좌표/주소.
+   * TripForm 의 검색 조건이 지금은 page.tsx 안에만 있어 이 컴포넌트로 전달되지 않는다.
+   * page.tsx 가 이 값을 내려주기 전까지는 합류 버튼이 안내 메시지만 띄운다.
+   */
+  myPickup?: LatLng;
+  myPickupAddress?: string;
+  myDropoff?: LatLng;
+  myDropoffAddress?: string;
 };
 
-export function MatchCard({ match, myId }: Props) {
+export function MatchCard({
+  match,
+  myId,
+  myPickup,
+  myPickupAddress,
+  myDropoff,
+  myDropoffAddress,
+}: Props) {
+  const router = useRouter();
+  const { me } = useMe();
   const [open, setOpen] = useState(false);
+  const [joining, setJoining] = useState(false);
   const s = match.settlement;
+
+  async function handleJoin() {
+    if (!me || !myPickup || !myDropoff) {
+      alert('합류에 필요한 내 위치 정보가 없습니다');
+      return;
+    }
+    setJoining(true);
+    try {
+      const res = await fetch(`/api/rooms/${match.roomId}/join`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          riderId: me.id,
+          nickname: me.nickname,
+          pickup: myPickup,
+          pickupAddress: myPickupAddress,
+          dropoff: myDropoff,
+          dropoffAddress: myDropoffAddress,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        alert(json.error ?? '합류에 실패했습니다');
+        return;
+      }
+      const data = json as JoinResponse;
+      router.push(`/rooms/${data.roomId}`);
+    } catch {
+      alert('합류에 실패했습니다');
+    } finally {
+      setJoining(false);
+    }
+  }
 
   return (
     <article className="overflow-hidden rounded-xl bg-white ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-800">
@@ -108,6 +162,17 @@ export function MatchCard({ match, myId }: Props) {
           )}
         </>
       )}
+
+      <div className="border-t border-slate-100 p-3 dark:border-slate-800">
+        <button
+          type="button"
+          onClick={handleJoin}
+          disabled={joining}
+          className="w-full rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:bg-slate-300 dark:disabled:bg-slate-700"
+        >
+          {joining ? '합류하는 중…' : '이 택시에 합류하기'}
+        </button>
+      </div>
     </article>
   );
 }
