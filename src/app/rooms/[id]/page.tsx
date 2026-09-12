@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { ParticipantList } from '@/components/room/ParticipantList';
 import { RoomMap } from '@/components/room/RoomMap';
+import { LeaveButton } from '@/components/room/LeaveButton';
 import { SettleButton } from '@/components/room/SettleButton';
 import { SettlementTable } from '@/components/room/SettlementTable';
 import { useRoomDetail } from '@/components/room/useRoomDetail';
@@ -74,6 +75,7 @@ export default function RoomDetailPage() {
 
       {/* 확정하면 room_members 가 갱신되고, realtime 구독이 화면을 자동으로 다시 읽는다 */}
       <SettleButton room={room} myId={me?.id} />
+      <LeaveButton room={room} myId={me?.id} />
     </main>
   );
 }

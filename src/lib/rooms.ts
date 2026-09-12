@@ -15,7 +15,8 @@ export const ROOM_SELECT = `id, host_id, origin_lat, origin_lng, origin_address,
    capacity, detour_tolerance, base_fare, total_distance_m, total_fare,
    room_members ( id, user_id, pickup_lat, pickup_lng, pickup_address,
                   dropoff_lat, dropoff_lng, dropoff_address,
-                  pickup_order, dropoff_order, solo_fare, final_fare, is_host, profiles ( nickname ) )`;
+                  pickup_order, dropoff_order, solo_fare, final_fare, is_host, joined_at,
+                  profiles ( nickname ) )`;
 
 /** 확정된 정산을 다시 읽을 때. fare_segments 까지 같이 가져온다. */
 export const ROOM_WITH_SEGMENTS_SELECT = `${ROOM_SELECT},
@@ -46,6 +47,7 @@ export type RoomMemberRow = {
   dropoff_order: number | null;
   solo_fare: number | null;
   final_fare: number | null;
+  joined_at: string;
   is_host: boolean;
   /** PostgREST 임베드. 실제로는 객체지만 타입 추론상 배열로 잡힌다. */
   profiles: { nickname: string } | { nickname: string }[] | null;
@@ -172,3 +174,14 @@ export function settlementFromRows(row: RoomRow): {
 
   return { segments, shares };
 }
+
+/** POST /api/rooms/[id]/leave 의 응답 계약 */
+export type LeaveResponse = {
+  roomId: string;
+  /** 내가 나간 뒤 남은 인원 */
+  remaining: number;
+  /** 남은 사람이 없으면 'cancelled' */
+  status: 'open' | 'cancelled';
+  /** 방장이 나가서 위임된 경우 새 방장의 id */
+  newHostId?: string;
+};
