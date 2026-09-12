@@ -102,8 +102,23 @@ export default function Home() {
                 {result.soloFare ? ` · 혼자 타면 ${won(result.soloFare)}` : ''}
               </p>
 
+              {/*
+                합류하려면 '내가 어디서 타고 어디서 내리는지'가 필요하다.
+                그 정보는 TripForm 이 들고 있다가 검색할 때만 올라오므로,
+                방금 검색한 조건(lastTrip)을 카드로 그대로 내려준다.
+              */}
               {accepted.map((m) => (
-                <MatchCard key={m.roomId} match={m} myId={me?.id ?? ''} />
+                <MatchCard
+                  key={m.roomId}
+                  match={m}
+                  myId={me?.id ?? ''}
+                  myPickup={lastTrip ? { lat: lastTrip.origin.lat, lng: lastTrip.origin.lng } : undefined}
+                  myPickupAddress={lastTrip?.origin.address}
+                  myDropoff={
+                    lastTrip ? { lat: lastTrip.destination.lat, lng: lastTrip.destination.lng } : undefined
+                  }
+                  myDropoffAddress={lastTrip?.destination.address}
+                />
               ))}
 
               {result.scanned > accepted.length && (
