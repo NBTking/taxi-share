@@ -262,7 +262,7 @@ async function evaluateRoom(
  * "방의 도착지"를 그대로 쓰면 안 된다. 새로 합류한 사람의 목적지가
  * 기존 도착지보다 더 멀 수 있고, 그 경우 그 사람이 마지막에 내려야 한다.
  */
-function finalDestinationOf(riders: Rider[], origin: LatLng): LatLng {
+export function finalDestinationOf(riders: Rider[], origin: LatLng): LatLng {
   return riders.reduce(
     (farthest, r) =>
       haversineM(r.dropoff, origin) > haversineM(farthest.dropoff, origin) ? r : farthest,
@@ -270,16 +270,21 @@ function finalDestinationOf(riders: Rider[], origin: LatLng): LatLng {
   ).dropoff;
 }
 
-/** RideEvent 순서를 카카오 길찾기 요청(출발 / 경유지 / 도착)으로 변환한다. */
+/** 승하차 이벤트 순서 → 카카오 길찾기 요청(출발 / 경유지 / 도착). */
+export function eventsToDirectionsRequest(events: RideEvent[]): DirectionsRequest {
+  return {
+    origin: events[0].point,
+    destination: events[events.length - 1].point,
+    waypoints: events.slice(1, -1).map((e) => e.point),
+  };
+}
+
+/** riders 로부터 이벤트를 만들어 길찾기 요청으로 변환한다. */
 function toDirectionsRequest(
   riders: Rider[],
   origin: LatLng,
   prebuiltEvents?: RideEvent[],
 ): DirectionsRequest {
   const events = prebuiltEvents ?? buildRideEvents(riders, finalDestinationOf(riders, origin));
-  return {
-    origin: events[0].point,
-    destination: events[events.length - 1].point,
-    waypoints: events.slice(1, -1).map((e) => e.point),
-  };
+  return eventsToDirectionsRequest(events);
 }

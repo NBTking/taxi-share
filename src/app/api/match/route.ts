@@ -1,10 +1,6 @@
 import { getDirections } from '@/lib/directions';
-import {
-  findMatches,
-  MATCH_DEFAULTS,
-  type MatchResponse,
-  type RoomCandidate,
-} from '@/lib/matching';
+import { findMatches, MATCH_DEFAULTS, type MatchResponse } from '@/lib/matching';
+import { ROOM_SELECT, toRoomCandidate, type RoomRow } from '@/lib/rooms';
 import { createClient } from '@/lib/supabase/server';
 import type { LatLng, Rider } from '@/lib/types';
 
@@ -44,12 +40,7 @@ export async function POST(request: Request) {
   const at = new Date(departAt).getTime();
   const { data, error } = await supabase
     .from('rooms')
-    .select(
-      `id, host_id, origin_lat, origin_lng, dest_lat, dest_lng, depart_at,
-       capacity, detour_tolerance, base_fare, total_distance_m,
-       room_members ( user_id, pickup_lat, pickup_lng, dropoff_lat, dropoff_lng,
-                      solo_fare, profiles ( nickname ) )`,
-    )
+    .select(ROOM_SELECT)
     .eq('status', 'open')
     .gte('depart_at', new Date(at - windowMs).toISOString())
     .lte('depart_at', new Date(at + windowMs).toISOString())
@@ -92,58 +83,6 @@ export async function POST(request: Request) {
     console.error('[api/match]', e);
     return Response.json({ error: '매칭 계산에 실패했습니다' }, { status: 500 });
   }
-}
-
-/** Supabase 행(스네이크 케이스) → matching.ts 가 쓰는 형태 */
-type RoomRow = {
-  id: string;
-  host_id: string;
-  origin_lat: number;
-  origin_lng: number;
-  dest_lat: number;
-  dest_lng: number;
-  depart_at: string;
-  capacity: number;
-  detour_tolerance: number;
-  base_fare: number;
-  total_distance_m: number | null;
-  room_members: Array<{
-    user_id: string;
-    pickup_lat: number;
-    pickup_lng: number;
-    dropoff_lat: number;
-    dropoff_lng: number;
-    solo_fare: number | null;
-    /** PostgREST 임베드. 객체로 오지만 타입 추론상 배열일 수도 있다. */
-    profiles: { nickname: string } | { nickname: string }[] | null;
-  }>;
-};
-
-function nicknameOf(profiles: RoomRow['room_members'][number]['profiles']): string {
-  if (!profiles) return '익명';
-  const p = Array.isArray(profiles) ? profiles[0] : profiles;
-  return p?.nickname ?? '익명';
-}
-
-function toRoomCandidate(row: RoomRow): RoomCandidate {
-  return {
-    id: row.id,
-    hostId: row.host_id,
-    origin: { lat: row.origin_lat, lng: row.origin_lng },
-    destination: { lat: row.dest_lat, lng: row.dest_lng },
-    departAt: row.depart_at,
-    capacity: row.capacity,
-    detourTolerance: row.detour_tolerance,
-    baseFare: row.base_fare,
-    currentDistanceM: row.total_distance_m ?? undefined,
-    members: (row.room_members ?? []).map((m) => ({
-      id: m.user_id,
-      nickname: nicknameOf(m.profiles),
-      pickup: { lat: m.pickup_lat, lng: m.pickup_lng },
-      dropoff: { lat: m.dropoff_lat, lng: m.dropoff_lng },
-      soloFare: m.solo_fare ?? undefined,
-    })),
-  };
 }
 
 type ParsedQuery = {
