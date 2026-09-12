@@ -4,6 +4,7 @@ import { eventsToDirectionsRequest, finalDestinationOf } from '@/lib/matching';
 import { ROOM_SELECT, toRoomCandidate, type JoinResponse, type RoomRow } from '@/lib/rooms';
 import { createClient } from '@/lib/supabase/server';
 import type { LatLng, Rider } from '@/lib/types';
+import { addressOr, parseLatLng } from '@/lib/validate';
 
 /**
  * POST /api/rooms/[id]/join — 방에 합류한다.
@@ -206,26 +207,10 @@ function parseRider(body: unknown): ParsedRider | { error: string } {
   const dropoff = parseLatLng(input.dropoff, 'dropoff');
   if (typeof dropoff === 'string') return { error: dropoff };
 
-  const asText = (v: unknown, fallback: LatLng) =>
-    typeof v === 'string' && v.length > 0
-      ? v
-      : `${fallback.lat.toFixed(4)}, ${fallback.lng.toFixed(4)}`;
-
   return {
     rider: { id: input.riderId, nickname: input.nickname, pickup, dropoff },
-    pickupAddress: asText(input.pickupAddress, pickup),
-    dropoffAddress: asText(input.dropoffAddress, dropoff),
+    pickupAddress: addressOr(input.pickupAddress, pickup),
+    dropoffAddress: addressOr(input.dropoffAddress, dropoff),
   };
 }
 
-function parseLatLng(value: unknown, field: string): LatLng | string {
-  if (typeof value !== 'object' || value === null) return `${field} 가 없거나 객체가 아닙니다`;
-  const { lat, lng } = value as { lat?: unknown; lng?: unknown };
-  if (typeof lat !== 'number' || !Number.isFinite(lat) || lat < -90 || lat > 90) {
-    return `${field}.lat 이 올바르지 않습니다`;
-  }
-  if (typeof lng !== 'number' || !Number.isFinite(lng) || lng < -180 || lng > 180) {
-    return `${field}.lng 이 올바르지 않습니다`;
-  }
-  return { lat, lng };
-}

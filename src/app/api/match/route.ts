@@ -2,6 +2,7 @@ import { getDirections } from '@/lib/directions';
 import { findMatches, MATCH_DEFAULTS, type MatchResponse } from '@/lib/matching';
 import { ROOM_SELECT, toRoomCandidate, type RoomRow } from '@/lib/rooms';
 import { createClient } from '@/lib/supabase/server';
+import { parseLatLng, positiveNumber } from '@/lib/validate';
 import type { LatLng, Rider } from '@/lib/types';
 
 /**
@@ -127,18 +128,4 @@ function parseQuery(body: unknown): ParsedQuery | { error: string } {
   };
 }
 
-function positiveNumber(value: unknown, fallback: number): number {
-  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : fallback;
-}
 
-function parseLatLng(value: unknown, field: string): LatLng | string {
-  if (typeof value !== 'object' || value === null) return `${field} 가 없거나 객체가 아닙니다`;
-  const { lat, lng } = value as { lat?: unknown; lng?: unknown };
-  if (typeof lat !== 'number' || !Number.isFinite(lat) || lat < -90 || lat > 90) {
-    return `${field}.lat 이 올바르지 않습니다`;
-  }
-  if (typeof lng !== 'number' || !Number.isFinite(lng) || lng < -180 || lng > 180) {
-    return `${field}.lng 이 올바르지 않습니다`;
-  }
-  return { lat, lng };
-}

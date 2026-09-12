@@ -90,3 +90,13 @@ export type JoinResponse = {
   /** 합류 후 방 전체 정산. 방 상세 화면이 그대로 렌더링한다. */
   settlement: Settlement;
 };
+
+/** POST /api/rooms 의 응답 계약 */
+export type CreateRoomResponse = {
+  roomId: string;
+  totalDistanceM: number;
+  totalDurationS: number;
+  totalFare: number;
+  /** 호스트 혼자일 때의 정산. 참가자가 늘면 합류 API 가 다시 계산한다. */
+  settlement: Settlement;
+};
