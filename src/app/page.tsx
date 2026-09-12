@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { KakaoMap, coordToAddress, type MapPin } from '@/components/KakaoMap';
+import { PlaceSearch } from '@/components/PlaceSearch';
 import { CAMPUS, QUICK_PLACES, type Place } from '@/lib/places';
 import { createClient } from '@/lib/supabase/client';
 import type { MatchResult } from '@/lib/matching';
@@ -17,6 +18,10 @@ export default function Home() {
   const [destination, setDestination] = useState<Place | null>(null);
   const [departAt, setDepartAt] = useState(() => toInputValue(new Date(Date.now() + 30 * 60_000)));
 
+  const [locating, setLocating] = useState(true);
+  const [locateFailed, setLocateFailed] = useState(false);
+  /** 출발지가 GPS 에서 온 것인지. 지도에서 직접 찍으면 false 가 된다. */
+  const [originFromGps, setOriginFromGps] = useState(false);
   const [searching, setSearching] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<{
@@ -66,11 +71,48 @@ export default function Home() {
     };
   }, []);
 
+  // 첫 진입 시 현재 위치를 출발지로 잡는다.
+  // 실패해도 CAMPUS 가 기본값으로 들어가 있어 화면은 그대로 쓸 수 있다.
+  useEffect(() => {
+    locate({ silent: true });
+    // 최초 1회만
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function locate({ silent }: { silent: boolean }) {
+    if (typeof navigator === 'undefined' || !navigator.geolocation) {
+      setLocating(false);
+      setLocateFailed(true);
+      return;
+    }
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const point = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        // 주소 변환은 지도 SDK 로딩을 기다릴 수 있어 마커부터 먼저 찍는다.
+        setOrigin({ ...point, address: '현재 위치' });
+        setOriginFromGps(true);
+        setLocating(false);
+        setLocateFailed(false);
+        const address = await coordToAddress(point);
+        setOrigin({ ...point, address });
+      },
+      () => {
+        // 권한 거부 / 타임아웃 / 안전하지 않은 컨텍스트
+        setLocating(false);
+        setLocateFailed(true);
+        if (!silent) setError('현재 위치를 가져오지 못했습니다. 지도를 눌러 직접 선택해주세요.');
+      },
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 60_000 },
+    );
+  }
+
   async function handlePick(point: LatLng) {
     const address = await coordToAddress(point);
     const place: Place = { ...point, address };
     if (picking === 'origin') {
       setOrigin(place);
+      setOriginFromGps(false);
       setPicking('destination'); // 출발지를 찍으면 자연히 다음은 도착지다
     } else {
       setDestination(place);
@@ -108,10 +150,12 @@ export default function Home() {
 
   const pins = useMemo<MapPin[]>(() => {
     const list: MapPin[] = [];
-    if (origin) list.push({ position: origin, label: '출발', kind: 'origin' });
+    if (origin) {
+      list.push({ position: origin, label: originFromGps ? '내 위치' : '출발', kind: 'origin' });
+    }
     if (destination) list.push({ position: destination, label: '도착', kind: 'destination' });
     return list;
-  }, [origin, destination]);
+  }, [origin, destination, originFromGps]);
 
   const accepted = result?.matches.filter((m) => m.accepted) ?? [];
   const canSearch = Boolean(me && origin && destination && !searching);
@@ -151,15 +195,46 @@ export default function Home() {
       </div>
 
       <div className="space-y-2 rounded-xl bg-slate-50 p-3 text-sm dark:bg-slate-900">
-        <Field label="출발" value={origin?.address} tone="emerald" />
-        <Field label="도착" value={destination?.address} tone="rose" />
+        <PlaceSearch
+          label="출발"
+          tone="emerald"
+          value={origin}
+          pendingText={locating ? '현재 위치 확인 중…' : undefined}
+          placeholder="출발지 검색 또는 지도 선택"
+          onSelect={(p) => {
+            setOrigin(p);
+            setOriginFromGps(false);
+          }}
+        />
+        <PlaceSearch
+          label="도착"
+          tone="rose"
+          value={destination}
+          placeholder="도착지 검색 또는 지도 선택"
+          onSelect={setDestination}
+        />
 
         <div className="flex flex-wrap gap-1.5 pt-1">
+          <button
+            type="button"
+            onClick={() => locate({ silent: false })}
+            disabled={locating}
+            className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700 ring-1 ring-emerald-200 transition hover:bg-emerald-100 disabled:opacity-50 dark:bg-emerald-950/50 dark:text-emerald-300 dark:ring-emerald-900"
+          >
+            {locating ? '확인 중…' : '내 위치'}
+          </button>
           {QUICK_PLACES.map((p) => (
             <button
               key={p.address}
               type="button"
-              onClick={() => (picking === 'origin' ? setOrigin(p) : setDestination(p))}
+              onClick={() => {
+                if (picking === 'origin') {
+                  setOrigin(p);
+                  setOriginFromGps(false);
+                } else {
+                  setDestination(p);
+                }
+              }}
               className="rounded-full bg-white px-2.5 py-1 text-xs text-slate-600 ring-1 ring-slate-200 transition hover:bg-slate-100 dark:bg-slate-800 dark:text-slate-300 dark:ring-slate-700"
             >
               {p.address}
@@ -312,27 +387,6 @@ function MatchCard({ match, myId }: { match: MatchResult; myId: string }) {
   );
 }
 
-function Field({
-  label,
-  value,
-  tone,
-}: {
-  label: string;
-  value?: string;
-  tone: 'emerald' | 'rose';
-}) {
-  return (
-    <div className="flex items-center gap-2">
-      <span
-        className={`h-2 w-2 shrink-0 rounded-full ${
-          tone === 'emerald' ? 'bg-emerald-500' : 'bg-rose-500'
-        }`}
-      />
-      <span className="w-8 shrink-0 text-slate-400">{label}</span>
-      <span className={value ? '' : 'text-slate-400'}>{value ?? '지도를 눌러 선택하세요'}</span>
-    </div>
-  );
-}
 
 const won = (n: number) => `${n.toLocaleString('ko-KR')}원`;
 

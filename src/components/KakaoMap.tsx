@@ -148,13 +148,15 @@ export function KakaoMap({
  * 지도를 클릭하면 좌표만 나오므로 변환이 필요하다.
  * services 라이브러리가 로드된 뒤에만 동작하므로 실패하면 좌표 문자열로 대체한다.
  */
-export function coordToAddress(point: LatLng): Promise<string> {
+export async function coordToAddress(point: LatLng): Promise<string> {
+  const fallback = `${point.lat.toFixed(4)}, ${point.lng.toFixed(4)}`;
+
+  // 현재 위치는 SDK 로딩보다 먼저 도착할 수 있다.
+  // 그때 바로 포기하면 주소 대신 좌표가 찍히므로 잠깐 기다린다.
+  const ready = await waitForServices(4000);
+  if (!ready) return fallback;
+
   return new Promise((resolve) => {
-    const fallback = `${point.lat.toFixed(4)}, ${point.lng.toFixed(4)}`;
-    if (typeof window === 'undefined' || !window.kakao?.maps?.services) {
-      resolve(fallback);
-      return;
-    }
     const geocoder = new window.kakao.maps.services.Geocoder();
     geocoder.coord2Address(point.lng, point.lat, (result, status) => {
       if (status !== window.kakao.maps.services.Status.OK || result.length === 0) {
@@ -164,5 +166,24 @@ export function coordToAddress(point: LatLng): Promise<string> {
       const first = result[0];
       resolve(first.road_address?.address_name ?? first.address?.address_name ?? fallback);
     });
+  });
+}
+
+/** services 라이브러리가 준비될 때까지 짧게 기다린다. */
+export function waitForServices(timeoutMs: number): Promise<boolean> {
+  if (typeof window === 'undefined') return Promise.resolve(false);
+  if (window.kakao?.maps?.services) return Promise.resolve(true);
+
+  return new Promise((resolve) => {
+    const startedAt = Date.now();
+    const timer = setInterval(() => {
+      if (window.kakao?.maps?.services) {
+        clearInterval(timer);
+        resolve(true);
+      } else if (Date.now() - startedAt > timeoutMs) {
+        clearInterval(timer);
+        resolve(false);
+      }
+    }, 100);
   });
 }
