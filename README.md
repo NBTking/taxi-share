@@ -56,7 +56,8 @@
 
 방을 만들 때 경로를 미리 계산해 저장해두므로, 후보 한 건당 길찾기 호출이 2회에서 **1회**로 줄어듭니다.
 
-## 실행
+<details>
+<summary><b>로컬에서 실행하기</b></summary>
 
 ```bash
 git clone https://github.com/NBTking/taxi-share.git
@@ -89,6 +90,8 @@ npx tsx scripts/seed.mts          # 데모 데이터 생성
 npx tsx scripts/fare.test.mts     # 정산 로직 검증
 npx tsx scripts/matching.test.mts # 매칭 로직 검증
 ```
+
+</details>
 
 ## 기술 스택
 
