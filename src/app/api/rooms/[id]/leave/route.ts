@@ -50,7 +50,14 @@ export async function POST(request: Request, ctx: RouteContext<'/api/rooms/[id]/
     console.error('[leave] supabase', error);
     return Response.json({ error: '방을 불러오지 못했습니다' }, { status: 500 });
   }
-  if (!data) return Response.json({ error: '방을 찾을 수 없습니다' }, { status: 404 });
+  if (!data) {
+    // 방이 이미 사라진 경우(데모 데이터 재생성, 지난 방 정리 등).
+    // 사용자가 할 수 있는 게 없는데 에러를 띄우면 화면에 갇힌다.
+    // 남아있을 수 있는 참가 기록만 정리하고 "나간 것" 으로 처리한다.
+    await supabase.from('room_members').delete().eq('room_id', roomId).eq('user_id', riderId);
+    const gone: LeaveResponse = { roomId, remaining: 0, status: 'cancelled' };
+    return Response.json(gone);
+  }
 
   const row = data as unknown as RoomRow;
 

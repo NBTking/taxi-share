@@ -36,7 +36,7 @@ async function main() {
 `);
 
   await ensurePeople();
-  await deleteAllRooms();
+  await deleteDemoRooms();
   await insertRooms();
 
   console.log(`
@@ -81,10 +81,16 @@ async function ensurePeople() {
   }
 }
 
-async function deleteAllRooms() {
+async function deleteDemoRooms() {
+  // 데모 계정이 만든 방만 지운다.
+  // 전부 지우면 심사위원이 만들어 둔 방까지 사라지고, 그 방에 있던 사람은
+  // 나가기를 눌렀을 때 "방을 찾을 수 없습니다" 를 보게 된다.
   // room_members / fare_segments 는 on delete cascade 로 같이 지워진다.
-  await rest('DELETE', '/rest/v1/rooms?id=neq.00000000-0000-0000-0000-000000000000');
-  console.log('\n  기존 방 삭제');
+  const ids = Object.values(PEOPLE)
+    .map((person) => person.id)
+    .filter((id): id is string => Boolean(id));
+  await rest('DELETE', `/rest/v1/rooms?host_id=in.(${ids.join(',')})`);
+  console.log('\n  기존 데모 방 삭제 (심사위원이 만든 방은 유지)');
 }
 
 async function insertRooms() {
