@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { KakaoMap, coordToAddress, type MapPin } from '@/components/KakaoMap';
 import { PlaceSearch } from '@/components/PlaceSearch';
 import { toDateTimeLocal } from '@/lib/format';
-import { CAMPUS, QUICK_PLACES, type Place } from '@/lib/places';
+import { HUB, QUICK_PLACES, type Place } from '@/lib/places';
 import type { CreateRoomResponse } from '@/lib/rooms';
 import type { LatLng } from '@/lib/types';
 import { useMe } from '@/lib/useMe';
@@ -24,7 +24,7 @@ export default function NewRoomPage() {
   const { me, error: authError } = useMe();
 
   const [picking, setPicking] = useState<Picking>('origin');
-  const [origin, setOrigin] = useState<Place | null>(CAMPUS);
+  const [origin, setOrigin] = useState<Place | null>(HUB);
   const [destination, setDestination] = useState<Place | null>(null);
   const [departAt, setDepartAt] = useState(() =>
     toDateTimeLocal(new Date(Date.now() + 30 * 60_000)),
@@ -87,7 +87,7 @@ export default function NewRoomPage() {
       <h1 className="text-xl font-bold tracking-tight">방 만들기</h1>
 
       <KakaoMap
-        center={destination ?? origin ?? CAMPUS}
+        center={destination ?? origin ?? HUB}
         level={destination && origin ? 8 : 5}
         pins={pins}
         onPick={handleMapPick}

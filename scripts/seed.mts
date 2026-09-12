@@ -16,10 +16,10 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { CAMPUS, GANGNAM, SADANG, PANGYO, type Place } from '../src/lib/places';
+import { GANGNAM, CHEONGGYESAN, PANGYO, JEONGJA, SADANG, GUNNAE, type Place } from '../src/lib/places';
 
 // 좌표는 src/lib/places.ts 한 곳에서만 관리한다.
-// 학교를 바꾸려면 그 파일의 CAMPUS 만 수정하면 시드와 화면이 같이 따라온다.
+// 학교를 바꾸려면 그 파일의 HUB 만 수정하면 시드와 화면이 같이 따라온다.
 
 const env = loadEnv();
 const SUPABASE_URL = env.NEXT_PUBLIC_SUPABASE_URL;
@@ -61,69 +61,62 @@ type SeedRoom = {
 
 const ROOMS: SeedRoom[] = [
   {
-    label: 'R1 정문 → 강남역',
-    note: '데모 메인 타깃. 자리 3개 남음',
+    label: 'R1 강남역 → 정자역',
+    note: '민서 혼자. 합류하면 2명',
     host: '민서',
-    origin: CAMPUS,
-    destination: GANGNAM,
-    departInMin: 30,
-    totalDistanceM: 20747,
-    totalFare: 24000,
-    members: [
-      { who: '민서', pickup: CAMPUS, dropoff: GANGNAM, soloFare: 24000, isHost: true },
-    ],
-  },
-  {
-    label: 'R2 정문 → 사당역',
-    note: '이미 2명이 탄 방. 경유 픽업이 들어간 상태',
-    host: '준호',
-    origin: CAMPUS,
-    destination: SADANG,
-    departInMin: 35,
-    totalDistanceM: 7184,
-    totalFare: 13100,
-    members: [
-      { who: '준호', pickup: CAMPUS, dropoff: SADANG, soloFare: 10200, isHost: true },
-      {
-        who: '하늘',
-        pickup: { lat: 37.485, lng: 127.01, address: '서초구 방배로' },
-        dropoff: { lat: 37.478, lng: 126.985, address: '사당역 2번 출구' },
-        soloFare: 6100,
-      },
-    ],
-  },
-  {
-    label: 'R3 정문 → 판교역',
-    note: '강남 방향과 겹쳐서 후보로 뜬다',
-    host: '서연',
-    origin: CAMPUS,
-    destination: PANGYO,
-    departInMin: 25,
-    totalDistanceM: 16082,
-    totalFare: 19700,
-    members: [{ who: '서연', pickup: CAMPUS, dropoff: PANGYO, soloFare: 19700, isHost: true }],
-  },
-  {
-    label: 'R4 강남역 → 정문  (역방향)',
-    note: '필터 테스트용. 이동 방향이 반대라 매칭에서 빠져야 한다',
-    host: '다인',
     origin: GANGNAM,
-    destination: CAMPUS,
+    destination: JEONGJA,
     departInMin: 30,
-    totalDistanceM: 21966,
-    totalFare: 26500,
-    members: [{ who: '다인', pickup: GANGNAM, dropoff: CAMPUS, soloFare: 26500, isHost: true }],
+    totalDistanceM: 20470,
+    totalFare: 23400,
+    members: [{ who: '민서', pickup: GANGNAM, dropoff: JEONGJA, soloFare: 23400, isHost: true }],
   },
   {
-    label: 'R5 정문 → 강남역  (2시간 뒤)',
-    note: '필터 테스트용. 시간창 밖이라 매칭에서 빠져야 한다',
-    host: '태윤',
-    origin: CAMPUS,
+    label: 'R2 강남역 → 정자역 (2명)',
+    note: '이미 청계산입구에서 한 명을 태운 방. 합류하면 3명이라 더 싸다',
+    host: '준호',
+    origin: GANGNAM,
+    destination: JEONGJA,
+    departInMin: 28,
+    totalDistanceM: 24406,
+    totalFare: 28400,
+    members: [
+      { who: '준호', pickup: GANGNAM, dropoff: JEONGJA, soloFare: 23400, isHost: true },
+      { who: '하늘', pickup: CHEONGGYESAN, dropoff: PANGYO, soloFare: 15000 },
+    ],
+  },
+  {
+    label: 'R3 강남역 → 사당역',
+    note: '필터 테스트. 서쪽 방향이라 회랑에서 벗어난다',
+    host: '서연',
+    origin: GANGNAM,
+    destination: SADANG,
+    departInMin: 32,
+    totalDistanceM: 6842,
+    totalFare: 10400,
+    members: [{ who: '서연', pickup: GANGNAM, dropoff: SADANG, soloFare: 10400, isHost: true }],
+  },
+  {
+    label: 'R4 정자역 → 강남역 (역방향)',
+    note: '필터 테스트. 이동 방향이 반대라 제외되어야 한다',
+    host: '다인',
+    origin: JEONGJA,
     destination: GANGNAM,
+    departInMin: 30,
+    totalDistanceM: 21089,
+    totalFare: 23900,
+    members: [{ who: '다인', pickup: JEONGJA, dropoff: GANGNAM, soloFare: 23900, isHost: true }],
+  },
+  {
+    label: 'R5 강남역 → 정자역 (2시간 뒤)',
+    note: '필터 테스트. 시간창 밖이라 제외되어야 한다',
+    host: '태윤',
+    origin: GANGNAM,
+    destination: JEONGJA,
     departInMin: 120,
-    totalDistanceM: 20747,
-    totalFare: 24000,
-    members: [{ who: '태윤', pickup: CAMPUS, dropoff: GANGNAM, soloFare: 24000, isHost: true }],
+    totalDistanceM: 20470,
+    totalFare: 23400,
+    members: [{ who: '태윤', pickup: GANGNAM, dropoff: JEONGJA, soloFare: 23400, isHost: true }],
   },
 ];
 
@@ -135,8 +128,8 @@ async function main() {
   await insertRooms();
 
   console.log('\n완료. 데모 시나리오:');
-  console.log('  지훈이 20:00쯤 회랑(37.4450,127.0560)에서 타고 강남역 근처(37.3660,127.1010)에서 내리려 한다');
-  console.log('  → R1 만 후보로 뜬다. R2/R3 는 회랑 이탈, R4 는 역방향, R5 는 시간창 밖으로 제외');
+  console.log(`  청계산입구역(${CHEONGGYESAN.lat},${CHEONGGYESAN.lng}) 에서 타고 궁내동(${GUNNAE.lat},${GUNNAE.lng}) 에서 내리려는 사람`);
+  console.log('  → R1, R2 가 후보로 뜬다. R3 는 회랑 이탈, R4 는 역방향, R5 는 시간창 밖으로 제외');
 }
 
 /** 없는 사람만 익명 가입으로 만든다. 재실행해도 계정이 쌓이지 않는다. */

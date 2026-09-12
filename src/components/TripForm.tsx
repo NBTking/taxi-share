@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { KakaoMap, coordToAddress, type MapPin } from '@/components/KakaoMap';
 import { PlaceSearch } from '@/components/PlaceSearch';
 import { toDateTimeLocal } from '@/lib/format';
-import { CAMPUS, QUICK_PLACES, type Place } from '@/lib/places';
+import { HUB, QUICK_PLACES, type Place } from '@/lib/places';
 import type { LatLng } from '@/lib/types';
 
 /**
@@ -29,7 +29,7 @@ type Props = {
 };
 
 export function TripForm({ onSearch, searching, disabled }: Props) {
-  const [origin, setOrigin] = useState<Place | null>(CAMPUS);
+  const [origin, setOrigin] = useState<Place | null>(HUB);
   const [destination, setDestination] = useState<Place | null>(null);
   const [departAt, setDepartAt] = useState(() => toDateTimeLocal(new Date(Date.now() + 30 * 60_000)));
 
@@ -39,7 +39,7 @@ export function TripForm({ onSearch, searching, disabled }: Props) {
   const [locateError, setLocateError] = useState<string | null>(null);
 
   // 첫 진입 시 현재 위치를 출발지로 잡는다.
-  // 실패해도 CAMPUS 가 기본값이라 화면은 그대로 쓸 수 있다.
+  // 실패해도 HUB 가 기본값이라 화면은 그대로 쓸 수 있다.
   useEffect(() => {
     locate({ silent: true });
     // 최초 1회만
@@ -102,7 +102,7 @@ export function TripForm({ onSearch, searching, disabled }: Props) {
   return (
     <>
       <KakaoMap
-        center={destination ?? origin ?? CAMPUS}
+        center={destination ?? origin ?? HUB}
         level={destination && origin ? 8 : 5}
         pins={pins}
         onPick={handleMapPick}

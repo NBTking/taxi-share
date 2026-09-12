@@ -91,7 +91,8 @@ export function MatchCard({
           )}
         </div>
         <div className="text-right text-xs text-slate-500 dark:text-slate-400">
-          <p>+{minutes(match.extraDurationS)} 우회</p>
+          {/* 경로가 바뀌면서 예상 시간이 오히려 줄기도 한다. "+-2분" 이 찍히지 않게 한다. */}
+          <p>{match.extraDurationS >= 60 ? `+${minutes(match.extraDurationS)} 우회` : '우회 없음'}</p>
           <p>{match.pickupOrder}번째 승차</p>
           {s && <p>{s.shares.length}명 동승</p>}
         </div>
