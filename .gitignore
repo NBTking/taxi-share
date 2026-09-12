@@ -39,3 +39,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# 작업 중 생성되는 임시 파일
+.places.json
+.routes.txt
