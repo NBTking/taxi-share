@@ -91,6 +91,10 @@ export function MatchCard({
           )}
         </div>
         <div className="text-right text-xs text-slate-500 dark:text-slate-400">
+          {/* 금액 다음으로 궁금한 건 "몇 분 걸리나" 다. 전체 운행이 아니라 내가 타는 시간을 보여준다. */}
+          <p className="font-medium text-slate-700 dark:text-slate-200">
+            내 탑승 {minutes(match.myRideDurationS)}
+          </p>
           {/* 경로가 바뀌면서 예상 시간이 오히려 줄기도 한다. "+-2분" 이 찍히지 않게 한다. */}
           <p>{match.extraDurationS >= 60 ? `+${minutes(match.extraDurationS)} 우회` : '우회 없음'}</p>
           <p>{match.pickupOrder}번째 승차</p>

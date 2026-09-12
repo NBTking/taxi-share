@@ -105,6 +105,8 @@ export function settleFare(input: SettleInput): Settlement {
   const riderById = new Map(riders.map((r) => [r.id, r]));
   /** 반올림 전 개인별 누적액 */
   const raw = new Map<RiderId, number>(riders.map((r) => [r.id, 0]));
+  /** 개인별 실제 탑승 시간(초). 중간에 타거나 먼저 내리면 전체 운행 시간보다 짧다. */
+  const rideSeconds = new Map<RiderId, number>(riders.map((r) => [r.id, 0]));
 
   const onboard = new Set<RiderId>();
   const segments: FareSegment[] = [];
@@ -127,6 +129,7 @@ export function settleFare(input: SettleInput): Settlement {
 
     for (const id of riderIds) {
       raw.set(id, (raw.get(id) ?? 0) + perPersonFare);
+      rideSeconds.set(id, (rideSeconds.get(id) ?? 0) + legs[i].durationS);
     }
 
     segments.push({
@@ -134,6 +137,7 @@ export function settleFare(input: SettleInput): Settlement {
       fromLabel: events[i].label,
       toLabel: events[i + 1].label,
       distanceM: legs[i].distanceM,
+      durationS: legs[i].durationS,
       segmentFare: Math.round(segmentFare),
       riderIds,
       riderCount: riderIds.length,
@@ -152,6 +156,7 @@ export function settleFare(input: SettleInput): Settlement {
     riderId: r.id,
     nickname: r.nickname,
     finalFare: roundUpTo(raw.get(r.id) ?? 0, roundTo),
+    rideDurationS: rideSeconds.get(r.id) ?? 0,
   }));
 
   const roundedSum = shares.reduce((sum, s) => sum + s.finalFare, 0);
@@ -175,6 +180,7 @@ export function settleFare(input: SettleInput): Settlement {
   return {
     totalFare,
     totalDistanceM,
+    totalDurationS: legs.reduce((sum, leg) => sum + leg.durationS, 0),
     baseFare,
     tollFare,
     segments,

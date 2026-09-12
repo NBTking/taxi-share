@@ -66,6 +66,8 @@ export type FareSegment = {
   fromLabel: string;
   toLabel: string;
   distanceM: number;
+  /** 이 구간 소요시간(초). DB(fare_segments)에는 저장하지 않아 복원 시에는 비어 있다. */
+  durationS?: number;
   /** 이 구간에서 발생한 요금(원) */
   segmentFare: number;
   riderIds: RiderId[];
@@ -85,12 +87,19 @@ export type RiderShare = {
   savedFare?: number;
   /** savedFare / soloFare (0~1) */
   savedRate?: number;
+  /**
+   * 내가 실제로 택시에 타고 있는 시간(초).
+   * 전체 운행 시간과 다르다 — 중간에 타거나 먼저 내리면 그만큼 짧다.
+   */
+  rideDurationS?: number;
 };
 
 export type Settlement = {
   /** 택시 총요금(원). 카카오가 준 실요금 */
   totalFare: number;
   totalDistanceM: number;
+  /** 택시 전체 운행 시간(초) */
+  totalDurationS: number;
   baseFare: number;
   /** 통행료(원). 기본요금과 함께 전원 균등 분배된다. */
   tollFare: number;

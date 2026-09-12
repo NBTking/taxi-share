@@ -83,6 +83,14 @@ export type MatchResult = {
   detourRatio: number;
   /** 늘어난 소요시간(초). 카드에 "+N분"으로 표시 */
   extraDurationS: number;
+  /** 택시 전체 운행 시간(초) */
+  totalDurationS: number;
+  /**
+   * 내가 실제로 타고 있는 시간(초).
+   * 중간에 타거나 먼저 내리면 전체 운행 시간보다 짧다.
+   * 합류 여부를 정할 때 금액 다음으로 중요한 정보다.
+   */
+  myRideDurationS: number;
   /** 합류했을 때 내 부담금(원) */
   myFare: number;
   soloFare?: number;
@@ -197,6 +205,8 @@ async function evaluateRoom(
     detourM: 0,
     detourRatio: 0,
     extraDurationS: 0,
+    totalDurationS: 0,
+    myRideDurationS: 0,
     myFare: 0,
   };
 
@@ -244,6 +254,8 @@ async function evaluateRoom(
       detourM,
       detourRatio,
       extraDurationS,
+      totalDurationS: after.durationS,
+      myRideDurationS: mine?.rideDurationS ?? after.durationS,
       myFare: mine?.finalFare ?? 0,
       soloFare: mine?.soloFare,
       savedFare: mine?.savedFare,

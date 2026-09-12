@@ -60,6 +60,11 @@ check('지훈 최종 6400원', s.shares[1].finalFare, 6400);
 check('★ 개인합계 == 총요금', s.shares.reduce((a, b) => a + b.finalFare, 0), 12000);
 check('민서 절약 6200원', s.shares[0].savedFare, 6200);
 check('전체거리 10000m', s.totalDistanceM, 10000);
+check('전체 소요시간 = 구간 합', s.totalDurationS, 300 + 700 + 400);
+// A: 1·2구간 탑승(300+700), B: 2·3구간 탑승(700+400)
+check('민서 탑승시간 1000초', s.shares[0].rideDurationS, 1000);
+check('지훈 탑승시간 1100초', s.shares[1].rideDurationS, 1100);
+check('개인 탑승시간 <= 전체', s.shares.every((x) => (x.rideDurationS ?? 0) <= s.totalDurationS), true);
 
 // ---------- 하차 순서 ----------
 const ev = buildRideEvents(riders, gangnam);
