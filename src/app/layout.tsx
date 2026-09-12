@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "같이 타요 · 택시 동승",
+  title: "택시투게더 · 택시 동승",
   description: "가는 길이 겹치는 사람끼리 택시를 나눠 타고, 이동한 거리만큼 요금을 나눕니다.",
 };
 

@@ -95,7 +95,7 @@ export default function Home() {
   return (
     <main className="mx-auto flex w-full max-w-lg flex-1 flex-col gap-4 p-4">
       <header className="flex items-baseline justify-between">
-        <h1 className="text-xl font-bold tracking-tight">같이 타요</h1>
+        <h1 className="text-xl font-bold tracking-tight">택시투게더</h1>
         <span className="text-xs text-slate-500 dark:text-slate-400">
           {me ? me.nickname : '연결 중…'}
         </span>
