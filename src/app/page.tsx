@@ -43,6 +43,7 @@ export default function Home() {
             dropoff: { lat: trip.destination.lat, lng: trip.destination.lng },
           },
           departAt: trip.departAt,
+          timeWindowMin: trip.timeWindowMin,
         }),
       });
       const json = await res.json();

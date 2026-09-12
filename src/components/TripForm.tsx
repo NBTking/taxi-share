@@ -25,8 +25,10 @@ const DEPART_LABELS: Record<DepartMode, string> = {
 export type Trip = {
   origin: Place;
   destination: Place;
-  /** ISO 문자열 */
+  /** 검색 기준 시각(ISO). 아래 timeWindowMin 과 함께 구간을 이룬다. */
   departAt: string;
+  /** departAt 기준 허용 오차(분). departAt ± 이 값이 검색 구간이다. */
+  timeWindowMin: number;
 };
 
 type Props = {
@@ -118,13 +120,25 @@ export function TripForm({ onSearch, searching, disabled }: Props) {
   }, [origin, destination, originFromGps]);
 
   /**
-   * 출발 시각을 확정한다.
+   * 검색할 시간 구간을 만든다.
+   *
+   * "N분 내" 는 말 그대로 [지금, 지금+N분] 전체를 뜻한다.
+   * 구간의 중앙을 departAt 으로, 절반을 허용 오차로 넘기면 그 구간이 된다.
+   * 그래서 '30분 내' 를 고르면 '10분 내' 에 걸리던 방도 모두 포함된다.
+   *
    * 임박 옵션은 '검색을 누른 시점' 기준으로 계산해야 화면을 오래 켜둬도 밀리지 않는다.
    */
-  function resolveDepartAt(): string {
-    if (departMode === 'in10') return new Date(Date.now() + 10 * 60_000).toISOString();
-    if (departMode === 'in30') return new Date(Date.now() + 30 * 60_000).toISOString();
-    return nextOccurrence(scheduledTime).toISOString();
+  function resolveDeparture(): { departAt: string; timeWindowMin: number } {
+    if (departMode === 'scheduled') {
+      // 예약은 특정 시각을 겨냥하므로 앞뒤로 여유를 준다
+      return { departAt: nextOccurrence(scheduledTime).toISOString(), timeWindowMin: 10 };
+    }
+    const withinMin = departMode === 'in10' ? 10 : 30;
+    const half = withinMin / 2;
+    return {
+      departAt: new Date(Date.now() + half * 60_000).toISOString(),
+      timeWindowMin: half,
+    };
   }
 
   const canSearch = Boolean(origin && destination && !searching && !disabled);
@@ -255,7 +269,7 @@ export function TripForm({ onSearch, searching, disabled }: Props) {
         type="button"
         onClick={() => {
           if (!origin || !destination) return;
-          onSearch({ origin, destination, departAt: resolveDepartAt() });
+          onSearch({ origin, destination, ...resolveDeparture() });
         }}
         disabled={!canSearch}
         className="rounded-xl bg-blue-600 px-4 py-3 font-semibold text-white transition hover:bg-blue-700 disabled:bg-slate-300 dark:disabled:bg-slate-700"
