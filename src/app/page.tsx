@@ -20,9 +20,11 @@ export default function Home() {
   const [searching, setSearching] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<MatchResponse | null>(null);
+  const [lastTrip, setLastTrip] = useState<Trip | null>(null);
 
   async function handleSearch(trip: Trip) {
     if (!me) return;
+    setLastTrip(trip);
     setSearching(true);
     setError(null);
     setResult(null);
@@ -65,29 +67,64 @@ export default function Home() {
       <TripForm onSearch={handleSearch} searching={searching} disabled={!me} />
 
       {shownError && (
-        <p className="rounded-lg bg-rose-50 p-3 text-sm text-rose-700 dark:bg-rose-950/40 dark:text-rose-300">
-          {shownError}
-        </p>
+        <div className="space-y-2 rounded-lg bg-rose-50 p-3 text-sm text-rose-700 dark:bg-rose-950/40 dark:text-rose-300">
+          <p>{shownError}</p>
+          {error && lastTrip && (
+            <button
+              type="button"
+              onClick={() => handleSearch(lastTrip)}
+              className="rounded-md bg-rose-100 px-2.5 py-1 text-xs font-medium text-rose-700 transition hover:bg-rose-200 dark:bg-rose-900/50 dark:text-rose-200 dark:hover:bg-rose-900"
+            >
+              다시 시도
+            </button>
+          )}
+        </div>
       )}
 
-      {result && (
-        <section className="space-y-3">
-          <p className="text-sm text-slate-500 dark:text-slate-400">
-            {accepted.length > 0
-              ? `동승 가능한 택시 ${accepted.length}대`
-              : '조건에 맞는 택시가 없습니다'}
-            {result.soloFare ? ` · 혼자 타면 ${won(result.soloFare)}` : ''}
-          </p>
-
-          {accepted.map((m) => (
-            <MatchCard key={m.roomId} match={m} myId={me?.id ?? ''} />
+      {searching && (
+        <section className="space-y-3" aria-live="polite" aria-busy="true">
+          <div className="h-4 w-32 animate-pulse rounded bg-slate-200 dark:bg-slate-800" />
+          {[0, 1].map((i) => (
+            <div
+              key={i}
+              className="h-20 animate-pulse rounded-xl bg-slate-100 ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-800"
+            />
           ))}
+        </section>
+      )}
 
-          {result.scanned > accepted.length && (
-            <p className="text-xs text-slate-400">
-              근처 {result.scanned}개 방 중 {result.scanned - accepted.length}개는 경로·시간이 맞지
-              않아 제외됐습니다.
-            </p>
+      {!searching && result && (
+        <section className="space-y-3">
+          {accepted.length > 0 ? (
+            <>
+              <p className="text-sm text-slate-500 dark:text-slate-400">
+                동승 가능한 택시 {accepted.length}대
+                {result.soloFare ? ` · 혼자 타면 ${won(result.soloFare)}` : ''}
+              </p>
+
+              {accepted.map((m) => (
+                <MatchCard key={m.roomId} match={m} myId={me?.id ?? ''} />
+              ))}
+
+              {result.scanned > accepted.length && (
+                <p className="text-xs text-slate-400">
+                  근처 {result.scanned}개 방 중 {result.scanned - accepted.length}개는 경로·시간이
+                  맞지 않아 제외됐습니다.
+                </p>
+              )}
+            </>
+          ) : (
+            <div className="rounded-xl border border-dashed border-slate-200 p-6 text-center dark:border-slate-700">
+              <p className="text-sm font-medium text-slate-700 dark:text-slate-200">
+                조건에 맞는 동승 택시가 없어요
+              </p>
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                출발 시각을 조금 조정하거나 잠시 후 다시 찾아보세요.
+              </p>
+              {result.soloFare && (
+                <p className="mt-2 text-xs text-slate-400">혼자 타면 {won(result.soloFare)}</p>
+              )}
+            </div>
           )}
         </section>
       )}

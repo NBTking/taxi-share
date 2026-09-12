@@ -28,10 +28,7 @@ type Props = {
   disabled?: boolean;
 };
 
-type Picking = 'origin' | 'destination';
-
 export function TripForm({ onSearch, searching, disabled }: Props) {
-  const [picking, setPicking] = useState<Picking>('origin');
   const [origin, setOrigin] = useState<Place | null>(CAMPUS);
   const [destination, setDestination] = useState<Place | null>(null);
   const [departAt, setDepartAt] = useState(() => toDateTimeLocal(new Date(Date.now() + 30 * 60_000)));
@@ -83,9 +80,9 @@ export function TripForm({ onSearch, searching, disabled }: Props) {
 
   async function handleMapPick(point: LatLng) {
     const place: Place = { ...point, address: await coordToAddress(point) };
-    if (picking === 'origin') {
+    // 빈 쪽부터 채우고, 둘 다 차 있으면 도착지를 새로 찍은 걸로 간주한다.
+    if (!origin) {
       pickOrigin(place);
-      setPicking('destination'); // 출발지를 찍었으면 자연히 다음은 도착지다
     } else {
       setDestination(place);
     }
@@ -112,22 +109,9 @@ export function TripForm({ onSearch, searching, disabled }: Props) {
         className="h-64 w-full ring-1 ring-black/5"
       />
 
-      <div className="flex gap-2 text-sm">
-        {(['origin', 'destination'] as const).map((kind) => (
-          <button
-            key={kind}
-            type="button"
-            onClick={() => setPicking(kind)}
-            className={`flex-1 rounded-lg px-3 py-2 font-medium transition ${
-              picking === kind
-                ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900'
-                : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300'
-            }`}
-          >
-            {kind === 'origin' ? '출발지 찍기' : '도착지 찍기'}
-          </button>
-        ))}
-      </div>
+      <p className="text-xs text-slate-400 dark:text-slate-500">
+        지도를 누르면 도착지가 채워집니다. 출발지를 바꾸려면 아래 검색창을 이용하세요.
+      </p>
 
       <div className="space-y-2 rounded-xl bg-slate-50 p-3 text-sm dark:bg-slate-900">
         <PlaceSearch
@@ -159,7 +143,7 @@ export function TripForm({ onSearch, searching, disabled }: Props) {
             <button
               key={p.address}
               type="button"
-              onClick={() => (picking === 'origin' ? pickOrigin(p) : setDestination(p))}
+              onClick={() => setDestination(p)}
               className="rounded-full bg-white px-2.5 py-1 text-xs text-slate-600 ring-1 ring-slate-200 transition hover:bg-slate-100 dark:bg-slate-800 dark:text-slate-300 dark:ring-slate-700"
             >
               {p.address}
