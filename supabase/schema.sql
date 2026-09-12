@@ -17,7 +17,7 @@ drop table if exists public.profiles      cascade;
 create table public.profiles (
   id          uuid primary key references auth.users(id) on delete cascade,
   nickname    text not null,
-  student_id  text,                 -- 학번 (교내 서비스이므로 신뢰 지표로 사용)
+  student_id  text,                 -- 소속 정보. 지금은 받아만 두고 검증하지 않는다
   department  text,
   created_at  timestamptz not null default now()
 );
