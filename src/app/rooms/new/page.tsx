@@ -82,6 +82,18 @@ export default function NewRoomPage() {
 
   const canCreate = Boolean(origin && destination && me && !creating);
 
+  // 버튼이 왜 안 눌리는지 알려주지 않으면 "방이 안 만들어진다" 로 보인다.
+  // 특히 검색창에 글자만 치고 목록에서 고르지 않으면 좌표가 없어 계속 막힌다.
+  const blockedReason = creating
+    ? null
+    : !me
+      ? '로그인 중입니다. 잠시만 기다려주세요.'
+      : !origin
+        ? '출발지를 검색 결과에서 선택하거나 지도를 눌러 지정하세요.'
+        : !destination
+          ? '도착지를 검색 결과에서 선택하거나 지도를 눌러 지정하세요.'
+          : null;
+
   return (
     <main className="mx-auto flex w-full max-w-lg flex-1 flex-col gap-4 p-4">
       <h1 className="text-xl font-bold tracking-tight">방 만들기</h1>
@@ -180,6 +192,10 @@ export default function NewRoomPage() {
       >
         {creating ? '만드는 중…' : '방 만들기'}
       </button>
+
+      {blockedReason && (
+        <p className="text-center text-xs text-slate-500 dark:text-slate-400">{blockedReason}</p>
+      )}
     </main>
   );
 }

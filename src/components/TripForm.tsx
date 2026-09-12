@@ -99,6 +99,18 @@ export function TripForm({ onSearch, searching, disabled }: Props) {
 
   const canSearch = Boolean(origin && destination && !searching && !disabled);
 
+  // 버튼이 왜 비활성인지 알려준다. 검색창에 글자만 치고 목록에서 고르지 않으면
+  // 좌표가 잡히지 않아 계속 막히는데, 안내가 없으면 "동작을 안 한다" 로 보인다.
+  const blockedReason = searching
+    ? null
+    : disabled
+      ? '로그인 중입니다. 잠시만 기다려주세요.'
+      : !origin
+        ? '출발지를 검색 결과에서 선택하거나 지도를 눌러 지정하세요.'
+        : !destination
+          ? '도착지를 검색 결과에서 선택하거나 지도를 눌러 지정하세요.'
+          : null;
+
   return (
     <>
       <KakaoMap
@@ -175,6 +187,10 @@ export function TripForm({ onSearch, searching, disabled }: Props) {
       >
         {searching ? '경로 계산 중…' : '동승 가능한 택시 찾기'}
       </button>
+
+      {blockedReason && (
+        <p className="text-center text-xs text-slate-500 dark:text-slate-400">{blockedReason}</p>
+      )}
     </>
   );
 }
